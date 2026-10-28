@@ -1,5 +1,4 @@
-# Launchpad
-
+# Launchpad - [Demo](https://j-houghton.github.io/launchpad/)
 A single-page launchpad for your apps and their environments — every app in a row, with a tile per environment (DEV, TEST, PROD…), pins, recent history, reachability dots, a clock and weather.
 
 It builds to **one self-contained `index.html`** that runs straight from disk — no server needed — and reads its content from a **`launchpad.config.js`** file sitting next to it. Set it up once, share the config file with your team.
