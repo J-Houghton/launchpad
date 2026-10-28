@@ -14,7 +14,7 @@
         const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
         const root = document.documentElement;
         root.classList.add(dark ? 'theme-dark' : 'theme-light');
-        root.dataset.palette = read('palette') === 'aurora' ? 'aurora' : 'classic';
+        root.dataset.palette = read('palette') === 'classic' ? 'classic' : 'aurora'; // Aurora unless Classic was picked
       })();
     </script>
   </head>

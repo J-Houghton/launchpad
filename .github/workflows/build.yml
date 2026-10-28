@@ -1,16 +1,22 @@
 # Builds the launchpad and publishes it.
 #
-#   • Push to main  → type-check + build, then deploy to GitHub Pages.
+#   • Push to main  → type-check + build, deploy to GitHub Pages, and publish a GitHub Release.
 #   • Pull request  → type-check + build only, to catch problems before merging.
 #   • Every run     → the built page (index.html + launchpad.config.js + favicon) is attached
 #                     as a "launchpad" artifact: download it from the run's summary page and
 #                     open index.html straight from disk.
+#
+# Release versions: the first release uses the version in package.json; after that, each push
+# to main bumps the patch number (1.0.0 → 1.0.1 → …). For a bigger step, raise package.json by
+# hand (e.g. to 1.1.0) and the next release starts from there. Commits that only touch Markdown
+# or the LICENSE don't trigger a release; neither does a commit message containing [skip ci].
 #
 name: Build and deploy
 
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'LICENSE']
   pull_request:
   workflow_dispatch:
 
@@ -19,18 +25,43 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # superseded PR builds can stop early; a deploy in progress is left to finish
+  # superseded PR builds can stop early; runs on main queue up so release numbers never collide
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags are needed to work out the next version
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Work out the version
+        id: version
+        run: |
+          latest=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+          latest=${latest#v}
+          base=$(node -p "require('./package.json').version")
+          if [ -z "$latest" ]; then
+            next=$base                                   # first release
+          elif [ "$base" != "$latest" ] && [ "$(printf '%s\n' "$latest" "$base" | sort -V | tail -n 1)" = "$base" ]; then
+            next=$base                                   # package.json was raised by hand
+          else
+            IFS=. read -r major minor patch <<< "$latest"
+            next="$major.$minor.$((patch + 1))"          # otherwise, the next patch
+          fi
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
+            echo "version=$next" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$next-dev.${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Version: $next"
 
       # the repo has no package-lock.json, so `npm install` rather than `npm ci`
       - name: Install dependencies
@@ -38,6 +69,8 @@ jobs:
 
       - name: Type-check and build
         run: npm run build
+        env:
+          LAUNCHPAD_VERSION: ${{ steps.version.outputs.version }} # shown in the page footer
 
       - name: Upload the built page
         uses: actions/upload-artifact@v4
@@ -66,3 +99,26 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to create the tag and the release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: launchpad
+          path: launchpad
+
+      # attaches the whole page as a zip, plus index.html on its own for swapping into an existing copy
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          (cd launchpad && zip -r "../launchpad-v$VERSION.zip" .)
+          gh release create "v$VERSION" "launchpad-v$VERSION.zip" launchpad/index.html \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "v$VERSION" --generate-notes

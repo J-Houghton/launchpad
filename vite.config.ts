@@ -1,8 +1,14 @@
 import { defineConfig, type Plugin } from 'vite';
+import { readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const CONFIG_FILE = fileURLToPath(new URL('./public/launchpad.config.js', import.meta.url));
+
+// shown in the page footer: the release workflow passes the release version in;
+// anything built locally is marked "-dev"
+const PACKAGE_VERSION: string = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version;
+const VERSION = process.env.LAUNCHPAD_VERSION || `${PACKAGE_VERSION}-dev`;
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -91,6 +97,7 @@ function saveConfigFile(): Plugin {
 
 export default defineConfig({
   base: './', // relative paths, so the build works from any folder (or file://)
+  define: { __APP_VERSION__: JSON.stringify(VERSION) },
   build: {
     assetsInlineLimit: () => true,
     cssCodeSplit: false,

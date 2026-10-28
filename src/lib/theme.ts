@@ -23,7 +23,7 @@ function write(key: string, value: string | null) {
 
 export const currentTheme = (): Theme => (root.classList.contains('theme-dark') ? 'dark' : 'light');
 export const themeMode = (): ThemeMode => (read('theme') as Theme | null) ?? 'system';
-export const currentPalette = (): Palette => (root.dataset.palette === 'aurora' ? 'aurora' : 'classic');
+export const currentPalette = (): Palette => (root.dataset.palette === 'classic' ? 'classic' : 'aurora');
 
 function apply(theme: Theme) {
   root.classList.toggle('theme-dark', theme === 'dark');

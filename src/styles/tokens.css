@@ -52,7 +52,7 @@ TOKENS
     }
 
     /* ----------------------------------------------------------------
-       CLASSIC (default) — the original page's colors:
+       CLASSIC — the original page's colors (also the base the other palette builds on):
        grey/white diagonal stripes, purple text, gold lines
        ---------------------------------------------------------------- */
     :root {
@@ -138,7 +138,7 @@ TOKENS
     }
 
     /* ----------------------------------------------------------------
-       AURORA — atmospheric purple/pink glow (Settings → Appearance)
+       AURORA (the default) — atmospheric purple/pink glow; switch in Settings → My view
        ---------------------------------------------------------------- */
     [data-palette="aurora"] {
         color-scheme: light;

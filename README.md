@@ -16,7 +16,7 @@ It builds to **one self-contained `index.html`** that runs straight from disk �
 
 ## Quick start
 
-**Use a ready-made build:** open the latest run under **Actions**, download the **launchpad** artifact, unzip it and open `index.html`.
+**Use a ready-made build:** download `launchpad-vX.Y.Z.zip` from the latest **Release**, unzip it and open `index.html`. Already set up? Just replace your `index.html` with the one attached to the release — your `launchpad.config.js` keeps working.
 
 **Or build it yourself** (Node 22 or newer):
 
@@ -54,7 +54,12 @@ Each check is a lightweight `no-cors` request, so a green dot means *the host an
 
 ## Deploying
 
-`.github/workflows/build.yml` type-checks and builds every push and pull request, attaches the built page as a downloadable artifact, and publishes `main` to GitHub Pages. To enable Pages, set **Settings → Pages → Source** to **GitHub Actions** once.
+`.github/workflows/build.yml` type-checks and builds every push and pull request, attaches the built page as a downloadable artifact, and for every push to `main`:
+
+- publishes the page to GitHub Pages (set **Settings → Pages → Source** to **GitHub Actions** once), and
+- creates a **GitHub Release** with release notes, the zipped page, and `index.html` on its own.
+
+Releases are numbered automatically: the first uses the version in `package.json`, then each push to `main` bumps the patch (`1.0.0` → `1.0.1` → …). Raise `package.json` by hand (say to `1.1.0`) for a bigger step. Changes to Markdown files or the license alone don't make a release, and nor does a commit message containing `[skip ci]`. The version is shown in the page footer; local builds end in `-dev`.
 
 > Anything in a published `launchpad.config.js` is public. Keep internal hostnames in your own local copy.
 

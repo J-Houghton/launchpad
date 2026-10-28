@@ -3,7 +3,7 @@
   "description": "A single-page launchpad for your apps and their environments, configured with one file and runnable straight from disk.",
   "license": "MIT",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

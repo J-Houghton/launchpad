@@ -50,12 +50,12 @@ const ICON_LABELS: Record<LinkIcon, string> = {
 
 const PALETTES: { id: Palette; name: string; description: string; swatches: string[] }[] = [
   {
-    id: 'classic', name: 'Classic', description: 'Greys, purple and gold, with a striped border.',
-    swatches: ['hsl(266 55% 35%)', 'hsl(41.45 87.36% 65.88%)', '#0b95da', '#da950b', '#e61a5e'],
+    id: 'aurora', name: 'Aurora', description: 'Soft purple, pink and gold glow with frosted glass. The default.',
+    swatches: ['oklch(0.48 0.2 300)', 'oklch(0.62 0.21 345)', 'oklch(0.66 0.15 245)', 'oklch(0.76 0.15 75)', 'oklch(0.7 0.11 185)'],
   },
   {
-    id: 'aurora', name: 'Aurora', description: 'Soft purple, pink and gold glow with frosted glass.',
-    swatches: ['oklch(0.48 0.2 300)', 'oklch(0.62 0.21 345)', 'oklch(0.66 0.15 245)', 'oklch(0.76 0.15 75)', 'oklch(0.7 0.11 185)'],
+    id: 'classic', name: 'Classic', description: 'Greys, purple and gold, with a striped border.',
+    swatches: ['hsl(266 55% 35%)', 'hsl(41.45 87.36% 65.88%)', '#0b95da', '#da950b', '#e61a5e'],
   },
 ];
 
