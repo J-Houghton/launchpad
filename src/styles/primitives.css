@@ -1,0 +1,121 @@
+/* ===============================
+PRIMITIVES — glass, icons, buttons, status dots
+================================*/
+@layer components {
+    .glass {
+        background: var(--glass);
+        border: 1px solid var(--glass-border);
+        -webkit-backdrop-filter: var(--glass-blur);
+        backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow), inset 0 1px 0 var(--glass-highlight);
+        transition: border-color var(--dur-med) ease, box-shadow var(--dur-med) ease;
+    }
+
+    /* panels, widgets and app rows: the edge brightens with a soft halo on hover */
+    :is(.panel, .widget, .app-card, .health-pill).glass:hover {
+        border-color: var(--glass-border-hover);
+        box-shadow:
+            var(--shadow),
+            inset 0 1px 0 var(--glass-highlight),
+            0 0 0 3px color-mix(in oklch, var(--accent) 9%, transparent);
+    }
+
+    .icon {
+        display: block;
+        flex: none;
+        width: 1em;
+        height: 1em;
+    }
+
+    .icon-btn {
+        display: inline-grid;
+        place-items: center;
+        flex: none;
+        width: 2.5rem;
+        aspect-ratio: 1;
+        border-radius: var(--radius-full);
+        color: var(--muted);
+        transition:
+            background-color var(--dur-fast) ease,
+            color var(--dur-fast) ease,
+            scale var(--dur-med) var(--ease-spring);
+    }
+
+    .icon-btn > * { grid-area: 1 / 1; }
+    .icon-btn .icon { width: 1.125rem; height: 1.125rem; }
+    .icon-btn:hover { background: var(--tile-hover); color: var(--ink); }
+    .icon-btn:active { scale: 0.9; }
+
+    .icon-btn.sm { width: 1.875rem; }
+    .icon-btn.sm .icon { width: 0.9rem; height: 0.9rem; }
+    .icon-btn.xs { width: 1.625rem; }
+    .icon-btn.xs .icon { width: 0.8rem; height: 0.8rem; }
+
+    .spinning .icon { animation: spin 0.9s linear infinite; }
+
+    .kbd {
+        display: inline-grid;
+        place-items: center;
+        vertical-align: middle;
+        width: 1.375rem;
+        height: 1.25rem;
+        border-radius: 0.375rem;
+        background: var(--tile-hover);
+        box-shadow: inset 0 -1px 0 var(--hairline), 0 0 0 1px var(--hairline);
+    }
+
+    /* ---- status dot ---- */
+    .status-dot {
+        position: relative;
+        flex: none;
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        background: var(--subtle);
+        transition: background-color var(--dur-med) ease, box-shadow var(--dur-med) ease;
+    }
+
+    .status-dot[data-state="up"] {
+        background: var(--ok);
+        box-shadow: 0 0 0 3px color-mix(in oklch, var(--ok) 22%, transparent), 0 0 10px color-mix(in oklch, var(--ok) 55%, transparent);
+    }
+
+    .status-dot[data-state="down"] {
+        background: var(--bad);
+        box-shadow: 0 0 0 3px color-mix(in oklch, var(--bad) 20%, transparent);
+    }
+
+    .status-dot[data-state="off"] {
+        background: transparent;
+        box-shadow: inset 0 0 0 1.5px var(--subtle);
+    }
+
+    /* checks turned off: no dot on tiles and chips (the quick-actions menu still says so) */
+    :is(.env-row, .chip) .status-dot[data-state="off"] { display: none; }
+
+    .status-dot[data-pending] {
+        animation: pulse 1.1s ease-in-out infinite;
+    }
+
+    /* radar ping, used on the summary dot */
+    .status-dot.ping[data-state="up"]::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--ok);
+        animation: ping 2.4s var(--ease-out) infinite;
+    }
+
+    /* ---- skeleton loaders ---- */
+    .skeleton {
+        border-radius: 0.5rem;
+        background: linear-gradient(90deg, var(--tile) 0%, var(--tile-hover) 50%, var(--tile) 100%) 0 0 / 200% 100%;
+        animation: shimmer 1.4s linear infinite;
+    }
+
+    .skeleton-lg { height: 2.75rem; width: 70%; margin-block: 0.15rem; }
+    .skeleton-sm { height: 0.9rem; width: 85%; margin-top: 0.35rem; }
+
+    .muted { color: var(--subtle); }
+}

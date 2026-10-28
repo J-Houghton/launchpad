@@ -1,0 +1,14 @@
+@layer tokens, base, components, utilities;
+
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+@import "./styles/primitives.css";
+@import "./styles/backdrop.css";
+@import "./styles/header.css";
+@import "./styles/hero.css";
+@import "./styles/dock.css";
+@import "./styles/apps.css";
+@import "./styles/menu.css";
+@import "./styles/settings.css";
+@import "./styles/footer.css";
+@import "./styles/utilities.css";

@@ -1,0 +1,87 @@
+/* ===============================
+BACKDROP — blobs, particles, grain
+================================*/
+@layer components {
+    .backdrop {
+        --cx: -100vmax; /* cursor position, set by the particle script */
+        --cy: -100vmax;
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        overflow: hidden;
+        background: var(--backdrop-base);
+        pointer-events: none;
+    }
+
+    /* the decorative layers (pattern + glow). Classic fades them out toward the
+       content column with a mask, so the middle reads as plain without a hard edge. */
+    .backdrop-art {
+        position: absolute;
+        inset: 0;
+        -webkit-mask-image: var(--art-mask);
+        mask-image: var(--art-mask);
+    }
+
+    .stripes {
+        position: absolute;
+        inset: 0;
+        background: var(--page-bg);
+    }
+
+    .blob {
+        position: absolute;
+        width: 62vmax;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background: radial-gradient(closest-side, var(--c), transparent);
+        animation: drift 40s var(--ease-in-out) infinite alternate;
+        will-change: transform;
+    }
+
+    .blob-1 { --c: var(--blob-1); top: -26vmax; left: -16vmax; }
+    .blob-2 { --c: var(--blob-2); top: -12vmax; right: -26vmax; animation-duration: 52s; animation-delay: -12s; }
+    .blob-3 { --c: var(--blob-3); bottom: -32vmax; left: 8vmax; animation-duration: 46s; animation-delay: -20s; }
+    .blob-4 { --c: var(--blob-4); bottom: -26vmax; right: -12vmax; animation-duration: 58s; animation-delay: -5s; }
+
+    @keyframes drift {
+        0% { transform: translate(0, 0) scale(1); }
+        50% { transform: translate(6vmax, 4vmax) scale(1.08); }
+        100% { transform: translate(-4vmax, 7vmax) scale(0.95); }
+    }
+
+    /* particles: wherever the pattern shows, plus a pool around the cursor anywhere on the page */
+    .backdrop canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        /* read by the particle script */
+        color: var(--particle);
+        -webkit-mask-image: var(--art-mask), radial-gradient(circle at var(--cx) var(--cy), #000 0 4rem, transparent 16rem);
+        mask-image: var(--art-mask), radial-gradient(circle at var(--cx) var(--cy), #000 0 4rem, transparent 16rem);
+    }
+
+    /* a soft light that follows the cursor */
+    .cursor-glow {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 36rem;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        translate: calc(var(--cx) - 50%) calc(var(--cy) - 50%);
+        background: radial-gradient(closest-side, color-mix(in oklch, var(--accent) var(--glow-mix, 14%), transparent), transparent);
+        opacity: 0;
+        transition: opacity var(--dur-slow) ease;
+    }
+
+    .backdrop[data-pointer] .cursor-glow { opacity: 1; }
+    .theme-dark .cursor-glow { --glow-mix: 22%; }
+
+    .grain {
+        position: absolute;
+        inset: 0;
+        opacity: var(--grain-opacity);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+}

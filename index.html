@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <title>Launchpad</title>
+    <script>
+      // apply the saved (or OS) theme and palette before first paint so there's no flash
+      (() => {
+        const read = key => { try { return localStorage.getItem(key); } catch { return null; } };
+        const saved = read('theme');
+        const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+        const root = document.documentElement;
+        root.classList.add(dark ? 'theme-dark' : 'theme-light');
+        root.dataset.palette = read('palette') === 'aurora' ? 'aurora' : 'classic';
+      })();
+    </script>
+  </head>
+  <body>
+    <app-shell></app-shell>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

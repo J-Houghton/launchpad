@@ -1,0 +1,266 @@
+/* ===============================
+HERO — typed headline + clock/weather
+================================*/
+@layer components {
+    .hero {
+        display: grid;
+        gap: var(--space-4);
+        align-items: end;
+        padding-block: clamp(1.25rem, 3.5vw, 2.5rem) clamp(0.25rem, 1vw, 0.75rem);
+    }
+
+    @media (width >= 60rem) {
+        .hero { grid-template-columns: minmax(0, 1fr) auto; }
+    }
+
+    /* scroll-driven: the headline recedes as you scroll away from it */
+    @supports (animation-timeline: scroll()) {
+        @media (prefers-reduced-motion: no-preference) {
+            .hero-copy {
+                transform-origin: left bottom;
+                animation: hero-recede linear both;
+                animation-timeline: scroll(root);
+                animation-range: 0 55vh;
+            }
+        }
+    }
+
+    @keyframes hero-recede {
+        to { opacity: 0.15; translate: 0 -1.5rem; scale: 0.97; filter: blur(4px); }
+    }
+
+    .eyebrow {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        margin-bottom: var(--space-3);
+        padding: 0.35rem 0.9rem 0.35rem 0.65rem;
+        border-radius: var(--radius-full);
+        font-size: var(--fs-sm);
+        font-weight: 500;
+        color: var(--muted);
+        background: var(--glass);
+        -webkit-backdrop-filter: var(--glass-blur);
+        backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-sm);
+    }
+
+    /* a light that travels around the border */
+    .eyebrow::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        padding: 1px;
+        border-radius: inherit;
+        background: conic-gradient(from var(--angle), var(--glass-border) 0 62%, var(--accent) 80%, var(--accent-2) 88%, var(--glass-border) 100%);
+        mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+        animation: spin-angle 5s linear infinite;
+        pointer-events: none;
+    }
+
+    .eyebrow-dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 20%, transparent);
+    }
+
+    /* ---- typed headline ---- */
+    .type-stack { display: grid; }
+    .type-stack > * { grid-area: 1 / 1; }
+    .type-ghost { visibility: hidden; }
+
+    .hero-title {
+        font: 400 var(--fs-display)/1 var(--font-display);
+        letter-spacing: -0.02em;
+    }
+
+    .hero-title .type-live {
+        background: linear-gradient(100deg, var(--ink) 10%, var(--accent) 45%, var(--accent-2) 65%, var(--ink) 95%) 0 0 / 220% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: sheen 12s var(--ease-in-out) infinite alternate;
+    }
+
+    @keyframes sheen {
+        to { background-position: 100% 0; }
+    }
+
+    .hero-sub {
+        margin-top: 0.4rem;
+        font: italic 400 var(--fs-display-sub)/1.2 var(--font-display);
+        color: var(--muted);
+    }
+
+    .type-live.has-caret::after {
+        content: "";
+        display: inline-block;
+        width: 0.06em;
+        height: 0.82em;
+        margin-left: 0.07em;
+        vertical-align: -0.04em;
+        border-radius: 1px;
+        background: var(--accent);
+        animation: caret 1.05s steps(1) infinite;
+    }
+
+    @keyframes caret {
+        50% { opacity: 0; }
+    }
+
+    /* ---- widgets ---- */
+    .hero-widgets {
+        display: grid;
+        grid-template-columns: repeat(var(--widgets, 2), minmax(0, 1fr));
+        gap: var(--space-2);
+    }
+
+    @media (width >= 60rem) {
+        .hero-widgets { grid-template-columns: repeat(var(--widgets, 2), 13.75rem); }
+    }
+
+    .widget {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        padding: 1rem 1.125rem 1.05rem;
+        border-radius: var(--radius-lg);
+        min-width: 0;
+    }
+
+    .widget-label {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-bottom: 0.15rem;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--subtle);
+        white-space: nowrap;
+    }
+
+    .widget-label .icon { color: var(--accent); }
+
+    .widget-foot {
+        font-size: var(--fs-sm);
+        line-height: 1.4;
+        color: var(--muted);
+        text-wrap: balance;
+    }
+
+    .clock-time,
+    .weather-temp {
+        font-size: 2.75rem;
+        font-weight: 600;
+        letter-spacing: -0.045em;
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .clock-time {
+        display: flex;
+        align-items: baseline;
+        overflow: hidden;
+    }
+
+    /* digits that change roll in from above */
+    .clock-time .digit {
+        display: inline-block;
+        animation: digit-in 0.55s var(--ease-spring) backwards;
+    }
+
+    .clock-time .colon {
+        margin-inline: 0.02em;
+        translate: 0 -0.06em;
+        animation: colon 2s steps(1) infinite;
+    }
+
+    .clock-period {
+        margin-left: 0.4rem;
+        font-size: var(--fs-sm);
+        font-weight: 600;
+        letter-spacing: 0;
+        color: var(--subtle);
+    }
+
+    @keyframes digit-in {
+        from { translate: 0 -0.7em; opacity: 0; filter: blur(4px); }
+    }
+
+    @keyframes colon {
+        50% { opacity: 0.3; }
+    }
+
+    /* extra time zones under the main clock */
+    .clock-zones {
+        display: grid;
+        gap: 0.2rem;
+        margin-top: 0.55rem;
+        padding-top: 0.55rem;
+        border-top: 1px solid var(--hairline);
+        font-size: var(--fs-sm);
+    }
+
+    .clock-zones li {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .zone-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--muted);
+    }
+
+    .zone-time {
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .zone-day {
+        margin-left: 0.2rem;
+        padding: 0 0.3rem;
+        border-radius: var(--radius-full);
+        font-size: 0.625rem;
+        font-weight: 700;
+        vertical-align: 0.15em;
+        color: var(--accent);
+        background: color-mix(in oklch, var(--accent) 14%, transparent);
+    }
+
+    .weather-now {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .weather-icon .icon {
+        width: 2.1rem;
+        height: 2.1rem;
+        color: var(--accent);
+    }
+
+    .weather-icon[data-kind="sun"] .icon {
+        color: var(--accent-3);
+        animation: spin 30s linear infinite;
+    }
+
+    .weather-icon[data-kind="cloud"] .icon,
+    .weather-icon[data-kind="rain"] .icon {
+        animation: bob 5s var(--ease-in-out) infinite;
+    }
+
+    @keyframes bob {
+        50% { translate: 0 -3px; }
+    }
+}

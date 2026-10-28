@@ -1,0 +1,461 @@
+/* ===============================
+APPS — section head, app rows, env tiles
+================================*/
+@layer components {
+    .apps {
+        display: grid;
+        gap: 1.25rem;
+    }
+
+    .section-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem 1rem;
+        padding-inline: 0.25rem;
+    }
+
+    .section-head h2 {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-size: 1.25rem;
+        font-weight: 650;
+        letter-spacing: -0.015em;
+    }
+
+    .count {
+        padding: 0.05rem 0.5rem;
+        border-radius: var(--radius-full);
+        font-size: var(--fs-xs);
+        font-weight: 600;
+        color: var(--accent);
+        background: color-mix(in oklch, var(--accent) 14%, transparent);
+    }
+
+    .health-pill {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.2rem 0.2rem 0.2rem 0.85rem;
+        border-radius: var(--radius-full);
+        font-size: var(--fs-sm);
+        color: var(--muted);
+        box-shadow: var(--shadow-sm), inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .apps-list {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .apps-empty {
+        display: grid;
+        justify-items: center;
+        gap: 0.75rem;
+        padding: 2.75rem 1.5rem;
+        border-radius: var(--radius-lg);
+        text-align: center;
+        color: var(--muted);
+    }
+
+    .apps-empty h3 {
+        font-size: 1.375rem;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+        color: var(--ink);
+    }
+
+    .apps-empty-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        padding: 0.6rem;
+        border-radius: 1rem;
+        color: var(--accent-fg);
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: 0 10px 24px -10px var(--accent);
+    }
+
+    .apps-empty-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 0.4rem;
+    }
+
+    /* ---- groups ---- */
+    .app-group {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .app-group + .app-group { margin-top: 0.75rem; }
+
+    .group-head {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.2rem 0.25rem;
+        border-radius: var(--radius-sm);
+        font-size: var(--fs-sm);
+        font-weight: 650;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-align: left;
+    }
+
+    .group-head .icon {
+        width: 1rem;
+        height: 1rem;
+        color: var(--subtle);
+        transition: rotate var(--dur-med) var(--ease-spring);
+    }
+
+    .app-group[data-collapsed] .group-head .icon { rotate: -90deg; }
+    .group-head:hover { color: var(--ink); }
+    .group-head:hover .icon { color: var(--accent); }
+
+    .group-rule {
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(to right, var(--hairline), transparent);
+    }
+
+    .group-apps {
+        display: grid;
+        gap: 1rem;
+    }
+
+    /* "2 hidden" — apps switched off in My view */
+    .hidden-note {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: var(--radius-full);
+        font-size: var(--fs-xs);
+        font-weight: 550;
+        color: var(--subtle);
+        transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+    }
+
+    .hidden-note .icon { width: 0.85rem; height: 0.85rem; }
+    .hidden-note:hover { color: var(--ink); background: var(--tile-hover); }
+
+    /* ---- app row ---- */
+    .app-card {
+        --mx: -100vmax;
+        --my: -100vmax;
+        position: relative;
+        isolation: isolate;
+        container: card / inline-size;
+        padding: clamp(1rem, 3vw, 1.375rem) clamp(1rem, 3vw, 1.5rem);
+        border-radius: var(--radius-lg);
+    }
+
+    /* spotlight: a soft glow + lit border that follow the cursor across every card */
+    .app-card::before,
+    .app-card::after {
+        content: "";
+        position: absolute;
+        border-radius: inherit;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity var(--dur-slow) ease;
+    }
+
+    .app-card::before {
+        inset: 0;
+        z-index: -1;
+        background: radial-gradient(30rem circle at var(--mx) var(--my), color-mix(in oklch, var(--accent) 14%, transparent), transparent 50%);
+    }
+
+    .app-card::after {
+        inset: -1px;
+        padding: 1.5px;
+        background: radial-gradient(22rem circle at var(--mx) var(--my), var(--accent), color-mix(in oklch, var(--accent-2) 55%, transparent) 25%, transparent 50%);
+        mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    }
+
+    .apps-list:hover .app-card::before,
+    .apps-list:hover .app-card::after { opacity: 1; }
+
+    /* stacked on narrow cards; app details beside the environments on wide ones */
+    .app-layout {
+        display: grid;
+        gap: 1.25rem;
+    }
+
+    @container card (width >= 58rem) {
+        .app-layout {
+            grid-template-columns: 15.5rem minmax(0, 1fr);
+            align-items: center;
+            gap: 2rem;
+        }
+    }
+
+    .app-info {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.9rem;
+        min-width: 0;
+    }
+
+    .app-mark {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 3rem;
+        aspect-ratio: 1;
+        border-radius: 0.95rem;
+        font-size: 0.75rem;
+        font-weight: 750;
+        letter-spacing: 0.02em;
+        color: white;
+        background: linear-gradient(135deg, oklch(0.64 0.2 var(--hue)), oklch(0.47 0.2 calc(var(--hue) + 40)));
+        box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.35), 0 8px 18px -8px oklch(0.5 0.2 var(--hue) / 0.8);
+        transition: scale var(--dur-med) var(--ease-spring), rotate var(--dur-med) var(--ease-spring);
+    }
+
+    .app-card:hover .app-mark { scale: 1.06; rotate: -4deg; }
+
+    .app-heading {
+        flex: 1;
+        min-width: 0;
+        padding-top: 0.1rem;
+    }
+
+    .app-title {
+        font-size: 1.125rem;
+        font-weight: 650;
+        letter-spacing: -0.015em;
+    }
+
+    .app-strap {
+        margin-top: 0.15rem;
+        font-size: var(--fs-sm);
+        color: var(--muted);
+    }
+
+    .app-docs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+        margin-top: 0.75rem;
+    }
+
+    /* icon pills: a circle that grows to reveal its label (width → auto, via interpolate-size) */
+    .icon-pill {
+        display: inline-flex;
+        align-items: center;
+        height: 2rem;
+        padding-inline: 0.5rem;
+        border-radius: var(--radius-full);
+        border: 1px solid var(--hairline);
+        background: var(--tile);
+        font-size: var(--fs-xs);
+        font-weight: 600;
+        color: var(--muted);
+        transition:
+            background-color var(--dur-fast) ease,
+            color var(--dur-fast) ease,
+            border-color var(--dur-fast) ease,
+            padding var(--dur-med) var(--ease-out);
+    }
+
+    .icon-pill .icon { width: 0.95rem; height: 0.95rem; }
+
+    .icon-pill .label {
+        width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        opacity: 0;
+        transition:
+            width var(--dur-med) var(--ease-out),
+            margin var(--dur-med) var(--ease-out),
+            opacity var(--dur-med) ease;
+    }
+
+    .icon-pill:hover,
+    .icon-pill:focus-visible {
+        padding-inline: 0.625rem 0.75rem;
+        color: var(--accent-fg);
+        background: var(--accent);
+        border-color: transparent;
+    }
+
+    .icon-pill:hover .label,
+    .icon-pill:focus-visible .label {
+        width: auto;
+        margin-left: 0.375rem;
+        opacity: 1;
+    }
+
+    /* ---- env tiles: one column per environment, in the configured order, so they line up across apps ---- */
+    .env-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    @container card (width >= 34rem) {
+        .env-grid { grid-template-columns: repeat(var(--env-count, 4), minmax(0, 1fr)); }
+    }
+
+    @container card (width < 15rem) {
+        .env-grid { grid-template-columns: 1fr; }
+    }
+
+    .env-tile {
+        position: relative;
+        min-height: 5.75rem;
+        border-radius: var(--radius);
+        border: 1px solid color-mix(in oklch, var(--env) 28%, var(--hairline));
+        background-color: color-mix(in oklch, var(--env) 6%, var(--tile));
+        transition:
+            background-color var(--dur-fast) ease,
+            border-color var(--dur-fast) ease,
+            box-shadow var(--dur-med) ease,
+            translate var(--dur-med) var(--ease-spring),
+            scale var(--dur-fast) ease;
+    }
+
+    /* the env-colored edge — a nod to the original cards' thick left border */
+    .env-tile::before {
+        content: "";
+        position: absolute;
+        left: -1px;
+        top: 0.9rem;
+        bottom: 0.9rem;
+        width: 3px;
+        border-radius: 0 3px 3px 0;
+        background: var(--env);
+        transition: top var(--dur-med) var(--ease-spring), bottom var(--dur-med) var(--ease-spring);
+    }
+
+    /* "handle with care" environments (e.g. production) get a faint hatch */
+    .env-tile[data-caution] {
+        background-image: repeating-linear-gradient(135deg, color-mix(in oklch, var(--env) 8%, transparent) 0 6px, transparent 6px 12px);
+    }
+
+    .env-tile:hover,
+    .env-tile:has(:focus-visible) {
+        background-color: color-mix(in oklch, var(--env) 14%, var(--tile-hover));
+        border-color: color-mix(in oklch, var(--env) 60%, transparent);
+        box-shadow: 0 12px 26px -14px color-mix(in oklch, var(--env) 80%, transparent);
+        translate: 0 -2px;
+    }
+
+    .env-tile:hover::before { top: 0.45rem; bottom: 0.45rem; }
+    .env-tile:active { scale: 0.985; translate: 0 0; }
+
+    .env-tile:has(.env-link:focus-visible) {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+    }
+
+    .env-link {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        height: 100%;
+        min-width: 0;
+        padding: 0.85rem 1rem 0.9rem 1.15rem;
+        border-radius: inherit;
+    }
+
+    .env-link:focus-visible { outline: none; }
+
+    /* stretch the link so the whole tile is clickable */
+    .env-link::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+    }
+
+    .env-row {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-height: 1.25rem;
+        padding-right: 1.5rem;
+    }
+
+    .env-tag {
+        font-size: 0.6875rem;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+        color: var(--env-ink);
+    }
+
+    .env-pinned .icon {
+        width: 0.75rem;
+        height: 0.75rem;
+        color: var(--accent);
+        rotate: 30deg;
+    }
+
+    .env-name,
+    .env-host {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .env-name {
+        font-size: 0.9375rem;
+        font-weight: 550;
+    }
+
+    .env-host {
+        font: 400 0.75rem/1.4 var(--font-mono);
+        color: var(--subtle);
+    }
+
+    .env-more {
+        position: absolute;
+        z-index: 1;
+        top: 0.5rem;
+        right: 0.5rem;
+        display: grid;
+        place-items: center;
+        width: 1.75rem;
+        aspect-ratio: 1;
+        border-radius: 0.5rem;
+        color: var(--muted);
+        opacity: 0;
+        transition: opacity var(--dur-fast) ease, background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+    }
+
+    .env-more .icon { width: 1rem; height: 1rem; }
+
+    .env-tile:hover .env-more,
+    .env-more:focus-visible { opacity: 1; }
+
+    .env-more:hover {
+        color: var(--ink);
+        background: color-mix(in oklch, var(--env) 22%, transparent);
+    }
+
+    @media (hover: none) {
+        .env-more { opacity: 1; }
+    }
+
+    /* a missing environment keeps its column, quietly */
+    .env-empty {
+        display: grid;
+        place-items: center;
+        min-height: 5.75rem;
+        border-radius: var(--radius);
+        border: 1px dashed color-mix(in oklch, var(--muted) 22%, transparent);
+        font-size: 0.6875rem;
+        font-weight: 650;
+        letter-spacing: 0.08em;
+        color: var(--subtle);
+        opacity: 0.7;
+    }
+}

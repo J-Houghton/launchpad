@@ -1,0 +1,163 @@
+/* ===============================
+DOCK — pinned + recent
+================================*/
+@layer components {
+    .dock {
+        display: grid;
+        gap: var(--space-2);
+    }
+
+    @media (width >= 56rem) {
+        .dock { grid-template-columns: 3fr 2fr; }
+    }
+
+    .panel {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        min-width: 0;
+        padding: 0.875rem 1rem 1rem 1.125rem;
+        border-radius: var(--radius-lg);
+    }
+
+    .panel-head {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 1.75rem;
+    }
+
+    .panel-title {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--subtle);
+    }
+
+    .panel-title .icon { color: var(--accent); }
+
+    .panel-count {
+        font-size: var(--fs-xs);
+        font-weight: 600;
+        padding: 0 0.45rem;
+        border-radius: var(--radius-full);
+        color: var(--accent);
+        background: color-mix(in oklch, var(--accent) 14%, transparent);
+    }
+
+    .panel-action {
+        margin-left: auto;
+        padding: 0.2rem 0.6rem;
+        border-radius: var(--radius-full);
+        font-size: var(--fs-xs);
+        font-weight: 500;
+        color: var(--muted);
+        transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+    }
+
+    .panel-action:hover { background: var(--tile-hover); color: var(--ink); }
+
+    .empty {
+        padding: 0.6rem 0.85rem;
+        border: 1px dashed color-mix(in oklch, var(--ink) 18%, transparent);
+        border-radius: var(--radius);
+        font-size: var(--fs-sm);
+        color: var(--muted);
+        line-height: 1.7;
+    }
+
+    .empty strong { color: var(--ink); font-weight: 600; }
+
+    /* ---- chips ---- */
+    .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .chip-item {
+        position: relative;
+        view-transition-name: var(--vt, none);
+        view-transition-class: chip;
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        height: 2.25rem;
+        padding: 0 0.8rem 0 0.75rem;
+        border-radius: var(--radius-full);
+        border: 1px solid color-mix(in oklch, var(--env) 30%, var(--hairline));
+        background: var(--tile);
+        font-size: var(--fs-sm);
+        white-space: nowrap;
+        transition:
+            background-color var(--dur-fast) ease,
+            border-color var(--dur-fast) ease,
+            box-shadow var(--dur-med) ease,
+            translate var(--dur-med) var(--ease-spring);
+    }
+
+    .chip:hover {
+        background: color-mix(in oklch, var(--env) 12%, var(--tile-hover));
+        border-color: color-mix(in oklch, var(--env) 55%, transparent);
+        box-shadow: 0 8px 20px -10px color-mix(in oklch, var(--env) 70%, transparent);
+        translate: 0 -1px;
+    }
+
+    .chip-app {
+        max-width: 10rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 600;
+    }
+
+    .chip-tag {
+        padding: 0.05rem 0.4rem;
+        border-radius: 0.375rem;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: var(--env-ink);
+        background: color-mix(in oklch, var(--env) 16%, transparent);
+    }
+
+    .chip-time {
+        font-size: var(--fs-xs);
+        color: var(--subtle);
+    }
+
+    /* pinned chips keep room for their unpin button */
+    .chip-item:has(.chip-x) .chip { padding-right: 2.125rem; }
+
+    .chip-x {
+        position: absolute;
+        top: 50%;
+        right: 0.3rem;
+        translate: 0 -50%;
+        display: grid;
+        place-items: center;
+        width: 1.5rem;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        color: var(--subtle);
+        opacity: 0.55;
+        transition: opacity var(--dur-fast) ease, background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+    }
+
+    .chip-x .icon { width: 0.8rem; height: 0.8rem; }
+    .chip-item:hover .chip-x,
+    .chip-x:focus-visible { opacity: 1; }
+    .chip-x:hover { color: var(--bad); background: color-mix(in oklch, var(--bad) 14%, transparent); }
+
+    /* view transitions: chips glide when pinned, unpinned or reordered */
+    ::view-transition-group(.chip) {
+        animation-duration: 450ms;
+        animation-timing-function: var(--ease-spring);
+    }
+}
