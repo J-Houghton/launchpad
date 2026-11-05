@@ -94,32 +94,41 @@ TOKENS
     }
 
     /* ---- CLASSIC — the original page's colours (and the base the others build on):
-            grey/white diagonal stripes, purple text, gold lines ---- */
+            grey/white diagonal stripes, purple text, gold lines ----
+
+       Each style sets six colours that anyone can change for themselves in My view (src/lib/colors.ts):
+       --bg, --panel, --ink, --accent, --accent-2 and --accent-3. Everything else is worked out from them
+       (relative colours keep a style's own lightness, strength and see-through-ness, and take the hue),
+       so a new accent recolours the glow, the borders and the particles too. */
     :root,
     [data-style="classic"] {
         color-scheme: light;
         --warn: hsl(40 90% 45%);
+        /* the hues of the accent, second accent and highlight: a colour combo (My view) changes just these */
+        --hue-1: 266;
+        --hue-2: 38;
+        --hue-3: 41.45;
 
         --bg: hsl(0 0% 82%);
         --panel: hsl(0 0% 100%);
-        --line: hsl(41.45 87.36% 65.88%);
+        --line: var(--accent-3);
         --page-bg: repeating-linear-gradient(135deg,
                 var(--panel) 0,
                 var(--panel) 9.8995px,
                 var(--bg) 9.8995px,
                 var(--bg) 12.7279px);
 
-        --ink: hsl(266 55% 35%);
+        --ink: hsl(var(--hue-1) 55% 35%);
         --muted: hsl(0 0% 10%);
         --subtle: hsl(0 0% 40%);
         --accent: var(--ink);
-        --accent-2: hsl(38 85% 47%);
-        --accent-3: var(--line);
+        --accent-2: hsl(var(--hue-2) 85% 47%);
+        --accent-3: hsl(var(--hue-3) 87.36% 65.88%);
         --accent-fg: var(--panel);
         --ink-mix: black;
 
         /* plain behind the content; the stripes fade in toward the side margins */
-        --backdrop-base: hsl(0 0% 95.5%);
+        --backdrop-base: color-mix(in srgb, var(--bg) 25%, var(--panel));
         --art-mask: linear-gradient(to right,
                 #000 calc(50% - var(--wrap-max) / 2 - 12rem),
                 transparent calc(50% - var(--wrap-max) / 2 + 1rem),
@@ -127,27 +136,27 @@ TOKENS
                 #000 calc(50% + var(--wrap-max) / 2 + 12rem));
         --glass: color-mix(in srgb, var(--panel) 80%, transparent);
         --glass-strong: color-mix(in srgb, var(--panel) 95%, transparent);
-        --glass-border: hsl(266 55% 35% / 0.24); /* soft purple edges */
-        --glass-border-hover: hsl(266 55% 42% / 0.55);
+        --glass-border: color-mix(in srgb, var(--ink) 24%, transparent); /* soft purple edges */
+        --glass-border-hover: hsl(from var(--ink) h s 42% / 0.55);
         --glass-highlight: hsl(0 0% 100% / 0.6);
         --glass-blur: blur(14px) saturate(1.2);
         --tile: color-mix(in srgb, var(--panel) 90%, var(--bg));
         --tile-hover: color-mix(in srgb, var(--panel) 88%, var(--ink));
-        --hairline: hsl(266 45% 35% / 0.14);
+        --hairline: hsl(from var(--ink) h calc(s * 0.82) l / 0.14);
         --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.06);
         --shadow: 0 4px 6px hsl(0 0% 0% / 0.05), 0 12px 28px -16px hsl(0 0% 0% / 0.22);
         --shadow-lg: 0 2px 6px hsl(0 0% 0% / 0.08), 0 30px 60px -20px hsl(0 0% 0% / 0.35);
         --ring: hsl(210 100% 40% / 0.7);
 
-        --blob-1: hsl(266 55% 55% / 0.14);
-        --blob-2: hsl(41 87% 66% / 0.22);
-        --blob-3: hsl(41 87% 60% / 0.16);
-        --blob-4: hsl(266 55% 65% / 0.12);
-        --particle: hsl(266 55% 35% / 0.55);
+        --blob-1: hsl(from var(--ink) h s 55% / 0.14);
+        --blob-2: hsl(from var(--accent-3) h s l / 0.22);
+        --blob-3: hsl(from var(--accent-3) h s 60% / 0.16);
+        --blob-4: hsl(from var(--ink) h s 65% / 0.12);
+        --particle: hsl(from var(--ink) h s l / 0.55);
         --grain-opacity: 0;
 
         /* where the cards' hues start (each card steps on round the wheel), and how strong they are */
-        --card-hue: 285;
+        --card-hue: calc(var(--hue-1) + 19);
         --card-chroma: 0.17;
     }
 
@@ -156,17 +165,17 @@ TOKENS
         color-scheme: dark;
         --bg: hsl(0 0% 12%);
         --panel: hsl(0 0% 18%);
-        --line: hsl(41.45 87.36% 30.12%);
 
-        --ink: hsl(266 55% 65%);
+        --ink: hsl(var(--hue-1) 55% 65%);
         --muted: hsl(0 0% 70%);
         --subtle: hsl(0 0% 52%);
-        --accent-2: hsl(41 87% 58%);
+        --accent-2: hsl(calc(var(--hue-2) + 3) 87% 58%);
+        --accent-3: hsl(var(--hue-3) 87.36% 30.12%);
         --ink-mix: white;
 
-        --backdrop-base: hsl(0 0% 14%);
+        --backdrop-base: color-mix(in srgb, var(--bg) 67%, var(--panel));
         --glass-border: hsl(0 0% 100% / 0.08);
-        --glass-border-hover: hsl(266 55% 70% / 0.35);
+        --glass-border-hover: hsl(from var(--ink) h s 70% / 0.35);
         --glass-highlight: hsl(0 0% 100% / 0.05);
         --tile: color-mix(in srgb, var(--panel) 85%, var(--bg));
         --tile-hover: color-mix(in srgb, var(--panel) 80%, white);
@@ -176,131 +185,142 @@ TOKENS
         --shadow-lg: 0 2px 6px hsl(0 0% 0% / 0.3), 0 30px 60px -20px hsl(0 0% 0% / 0.7);
         --ring: hsl(210 100% 70% / 0.8);
 
-        --blob-1: hsl(266 55% 45% / 0.22);
-        --blob-2: hsl(41 87% 40% / 0.12);
-        --blob-3: hsl(41 87% 40% / 0.1);
-        --blob-4: hsl(266 55% 50% / 0.16);
-        --particle: hsl(266 55% 75% / 0.55);
+        --blob-1: hsl(from var(--ink) h s 45% / 0.22);
+        --blob-2: hsl(from var(--accent-3) h s 40% / 0.12);
+        --blob-3: hsl(from var(--accent-3) h s 40% / 0.1);
+        --blob-4: hsl(from var(--ink) h s 50% / 0.16);
+        --particle: hsl(from var(--ink) h s 75% / 0.55);
     }
 
     /* ---- AURORA (the default) — a purple and pink glow over the whole page, frosted glass ---- */
     [data-style="aurora"] {
         color-scheme: light;
+        --hue-1: 300;
+        --hue-2: 345;
+        --hue-3: 70;
 
-        --bg: oklch(0.972 0.014 305);
+        --bg: oklch(0.972 0.014 calc(var(--hue-1) + 5));
         --backdrop-base: var(--bg);
         --page-bg: none;
         --art-mask: linear-gradient(#000 0 0); /* the glow covers the whole page */
-        --ink: oklch(0.25 0.07 300);
-        --muted: oklch(0.47 0.045 300);
-        --subtle: oklch(0.6 0.03 300);
-        --accent: oklch(0.48 0.2 300);
-        --accent-2: oklch(0.62 0.21 345);
-        --accent-3: oklch(0.78 0.14 70);
+        --ink: oklch(0.25 0.07 var(--hue-1));
+        --muted: oklch(0.47 0.045 var(--hue-1));
+        --subtle: oklch(0.6 0.03 var(--hue-1));
+        --accent: oklch(0.48 0.2 var(--hue-1));
+        --accent-2: oklch(0.62 0.21 var(--hue-2));
+        --accent-3: oklch(0.78 0.14 var(--hue-3));
         --accent-fg: oklch(0.99 0 0);
         --ink-mix: black;
 
-        --glass: oklch(1 0 0 / 0.56);
-        --glass-strong: oklch(0.99 0.005 300 / 0.88);
+        --panel: oklch(1 0 0);
+        --glass: color-mix(in oklab, var(--panel) 56%, transparent);
+        --glass-strong: color-mix(in oklab, var(--panel) 88%, transparent);
         --glass-border: oklch(1 0 0 / 0.75);
-        --glass-border-hover: oklch(0.6 0.18 300 / 0.45);
+        --glass-border-hover: oklch(from var(--accent) 0.6 calc(c * 0.9) h / 0.45);
         --glass-highlight: oklch(1 0 0 / 0.8);
         --glass-blur: blur(20px) saturate(1.6);
-        --tile: oklch(1 0 0 / 0.55);
-        --tile-hover: oklch(1 0 0 / 0.85);
-        --hairline: oklch(0.35 0.08 300 / 0.1);
-        --shadow-sm: 0 1px 2px oklch(0.3 0.1 300 / 0.08);
-        --shadow: 0 1px 2px oklch(0.3 0.1 300 / 0.06), 0 10px 30px -12px oklch(0.35 0.14 300 / 0.25);
-        --shadow-lg: 0 2px 6px oklch(0.3 0.1 300 / 0.08), 0 30px 60px -20px oklch(0.3 0.14 300 / 0.4);
-        --ring: oklch(0.55 0.22 300);
+        --tile: color-mix(in oklab, var(--panel) 55%, transparent);
+        --tile-hover: color-mix(in oklab, var(--panel) 85%, transparent);
+        --hairline: oklch(from var(--ink) 0.35 calc(c * 1.15) h / 0.1);
+        --shadow-sm: 0 1px 2px oklch(from var(--accent) 0.3 calc(c / 2) h / 0.08);
+        --shadow: 0 1px 2px oklch(from var(--accent) 0.3 calc(c / 2) h / 0.06),
+            0 10px 30px -12px oklch(from var(--accent) 0.35 calc(c * 0.7) h / 0.25);
+        --shadow-lg: 0 2px 6px oklch(from var(--accent) 0.3 calc(c / 2) h / 0.08),
+            0 30px 60px -20px oklch(from var(--accent) 0.3 calc(c * 0.7) h / 0.4);
+        --ring: oklch(from var(--accent) 0.55 calc(c * 1.1) h);
 
-        --blob-1: oklch(0.74 0.17 300 / 0.55);
-        --blob-2: oklch(0.8 0.15 345 / 0.45);
-        --blob-3: oklch(0.88 0.12 75 / 0.55);
-        --blob-4: oklch(0.78 0.12 255 / 0.5);
-        --particle: oklch(0.42 0.16 300);
+        --blob-1: oklch(from var(--accent) 0.74 calc(c * 0.85) h / 0.55);
+        --blob-2: oklch(from var(--accent-2) 0.8 calc(c * 0.71) h / 0.45);
+        --blob-3: oklch(from var(--accent-3) 0.88 calc(c * 0.86) calc(h + 5) / 0.55);
+        --blob-4: oklch(from var(--accent) 0.78 calc(c * 0.6) calc(h - 45) / 0.5);
+        --particle: oklch(from var(--accent) 0.42 calc(c * 0.8) h);
         --grain-opacity: 0.05;
-        --card-hue: 285;
+        --card-hue: calc(var(--hue-1) - 15);
         --card-chroma: 0.17;
     }
 
     .theme-dark[data-style="aurora"],
     .theme-dark [data-style="aurora"] {
         color-scheme: dark;
-        --bg: oklch(0.155 0.03 295);
-        --ink: oklch(0.96 0.012 300);
-        --muted: oklch(0.76 0.035 300);
-        --subtle: oklch(0.6 0.035 300);
-        --accent: oklch(0.74 0.16 300);
-        --accent-2: oklch(0.74 0.17 345);
-        --accent-3: oklch(0.83 0.13 75);
-        --accent-fg: oklch(0.17 0.03 295);
+        --bg: oklch(0.155 0.03 calc(var(--hue-1) - 5));
+        --ink: oklch(0.96 0.012 var(--hue-1));
+        --muted: oklch(0.76 0.035 var(--hue-1));
+        --subtle: oklch(0.6 0.035 var(--hue-1));
+        --accent: oklch(0.74 0.16 var(--hue-1));
+        --accent-2: oklch(0.74 0.17 var(--hue-2));
+        --accent-3: oklch(0.83 0.13 calc(var(--hue-3) + 5));
+        --accent-fg: oklch(0.17 0.03 calc(var(--hue-1) - 5));
         --ink-mix: white;
 
-        --glass: oklch(0.26 0.04 300 / 0.45);
-        --glass-strong: oklch(0.22 0.035 300 / 0.9);
+        --panel: oklch(0.26 0.04 var(--hue-1));
+        --glass: color-mix(in oklab, var(--panel) 45%, transparent);
+        --glass-strong: oklch(from var(--panel) calc(l - 0.04) calc(c * 0.88) h / 0.9);
         --glass-border: oklch(1 0 0 / 0.09);
-        --glass-border-hover: oklch(0.78 0.14 300 / 0.32);
+        --glass-border-hover: oklch(from var(--accent) 0.78 calc(c * 0.9) h / 0.32);
         --glass-highlight: oklch(1 0 0 / 0.07);
-        --tile: oklch(1 0 0 / 0.035);
-        --tile-hover: oklch(1 0 0 / 0.075);
+        --tile: color-mix(in oklab, var(--ink) 3.5%, transparent);
+        --tile-hover: color-mix(in oklab, var(--ink) 7.5%, transparent);
         --hairline: oklch(1 0 0 / 0.08);
         --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
         --shadow: 0 1px 2px oklch(0 0 0 / 0.25), 0 12px 32px -12px oklch(0 0 0 / 0.6);
         --shadow-lg: 0 2px 6px oklch(0 0 0 / 0.3), 0 30px 60px -20px oklch(0 0 0 / 0.7);
-        --ring: oklch(0.78 0.16 300);
+        --ring: oklch(from var(--accent) calc(l + 0.04) c h);
 
-        --blob-1: oklch(0.45 0.21 300 / 0.55);
-        --blob-2: oklch(0.45 0.19 345 / 0.35);
-        --blob-3: oklch(0.55 0.13 65 / 0.18);
-        --blob-4: oklch(0.42 0.17 265 / 0.45);
-        --particle: oklch(0.86 0.07 300);
+        --blob-1: oklch(from var(--accent) 0.45 calc(c * 1.3) h / 0.55);
+        --blob-2: oklch(from var(--accent-2) 0.45 calc(c * 1.12) h / 0.35);
+        --blob-3: oklch(from var(--accent-3) 0.55 c calc(h - 10) / 0.18);
+        --blob-4: oklch(from var(--accent) 0.42 calc(c * 1.06) calc(h - 35) / 0.45);
+        --particle: oklch(from var(--accent) 0.86 calc(c * 0.45) h);
         --grain-opacity: 0.07;
     }
 
     /* ---- BLUEPRINT — grid paper, square corners, monospaced type; navy at night ---- */
     [data-style="blueprint"] {
         color-scheme: light;
-        --bg: oklch(0.968 0.016 240);
+        --hue-1: 252;
+        --hue-2: 215;
+        --hue-3: 65;
+        --bg: oklch(0.968 0.016 calc(var(--hue-1) - 12));
         --backdrop-base: var(--bg);
-        --grid-line: oklch(0.55 0.14 245 / 0.17);
-        --grid-fine: oklch(0.55 0.14 245 / 0.07);
+        --grid-line: oklch(from var(--accent) 0.55 calc(c * 0.82) calc(h - 7) / 0.17);
+        --grid-fine: oklch(from var(--accent) 0.55 calc(c * 0.82) calc(h - 7) / 0.07);
         --page-bg:
             linear-gradient(var(--grid-line) 1px, transparent 1px) -1px -1px / 120px 120px,
             linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) -1px -1px / 120px 120px,
             linear-gradient(var(--grid-fine) 1px, transparent 1px) -1px -1px / 24px 24px,
             linear-gradient(90deg, var(--grid-fine) 1px, transparent 1px) -1px -1px / 24px 24px;
         --art-mask: linear-gradient(#000 0 0);
-        --ink: oklch(0.27 0.08 255);
-        --muted: oklch(0.44 0.06 250);
-        --subtle: oklch(0.58 0.05 248);
-        --accent: oklch(0.5 0.17 252);
-        --accent-2: oklch(0.6 0.12 215);
-        --accent-3: oklch(0.72 0.15 65);
+        --ink: oklch(0.27 0.08 calc(var(--hue-1) + 3));
+        --muted: oklch(0.44 0.06 calc(var(--hue-1) - 2));
+        --subtle: oklch(0.58 0.05 calc(var(--hue-1) - 4));
+        --accent: oklch(0.5 0.17 var(--hue-1));
+        --accent-2: oklch(0.6 0.12 var(--hue-2));
+        --accent-3: oklch(0.72 0.15 var(--hue-3));
         --accent-fg: oklch(0.99 0 0);
         --ink-mix: black;
 
-        --glass: oklch(0.99 0.006 240 / 0.88);
-        --glass-strong: oklch(0.99 0.006 240 / 0.97);
-        --glass-border: oklch(0.5 0.13 250 / 0.42);
-        --glass-border-hover: oklch(0.5 0.17 252 / 0.85);
+        --panel: oklch(0.99 0.006 calc(var(--hue-1) - 12));
+        --glass: color-mix(in oklab, var(--panel) 88%, transparent);
+        --glass-strong: color-mix(in oklab, var(--panel) 97%, transparent);
+        --glass-border: oklch(from var(--accent) 0.5 calc(c * 0.76) h / 0.42);
+        --glass-border-hover: color-mix(in oklab, var(--accent) 85%, transparent);
         --glass-highlight: transparent;
         --glass-blur: none;
-        --tile: oklch(0.975 0.012 240);
-        --tile-hover: oklch(0.95 0.03 240);
-        --hairline: oklch(0.5 0.12 250 / 0.2);
+        --tile: oklch(from var(--panel) calc(l - 0.015) min(c * 2, c + 0.006) h);
+        --tile-hover: oklch(from var(--panel) calc(l - 0.04) min(c * 5, c + 0.024) h);
+        --hairline: oklch(from var(--accent) 0.5 calc(c * 0.7) h / 0.2);
         --shadow-sm: 0 0 #0000;
         --shadow: 0 0 #0000;
-        --shadow-lg: 0 18px 40px -24px oklch(0.3 0.1 255 / 0.45);
-        --ring: oklch(0.55 0.2 252);
+        --shadow-lg: 0 18px 40px -24px oklch(from var(--ink) 0.3 calc(c * 1.25) h / 0.45);
+        --ring: oklch(from var(--accent) 0.55 calc(c * 1.18) h);
 
-        --blob-1: oklch(0.88 0.05 240 / 0.45);
+        --blob-1: oklch(from var(--accent) 0.88 calc(c * 0.3) calc(h - 12) / 0.45);
         --blob-2: transparent;
-        --blob-3: oklch(0.9 0.04 220 / 0.4);
+        --blob-3: oklch(from var(--accent-2) 0.9 calc(c * 0.33) calc(h + 5) / 0.4);
         --blob-4: transparent;
-        --particle: oklch(0.5 0.15 252);
+        --particle: oklch(from var(--accent) l calc(c * 0.88) h);
         --grain-opacity: 0;
-        --card-hue: 230;
+        --card-hue: calc(var(--hue-1) - 22);
         --card-chroma: 0.12;
 
         --radius-sm: 2px;
@@ -328,36 +348,40 @@ TOKENS
     .theme-dark[data-style="blueprint"],
     .theme-dark [data-style="blueprint"] {
         color-scheme: dark;
-        --bg: oklch(0.25 0.075 257);
-        --grid-line: oklch(0.88 0.07 230 / 0.14);
-        --grid-fine: oklch(0.88 0.07 230 / 0.055);
-        --ink: oklch(0.96 0.015 230);
-        --muted: oklch(0.82 0.04 232);
-        --subtle: oklch(0.68 0.05 235);
-        --accent: oklch(0.83 0.11 222);
-        --accent-2: oklch(0.8 0.1 190);
-        --accent-3: oklch(0.86 0.13 85);
-        --accent-fg: oklch(0.24 0.075 257);
+        --bg: oklch(0.25 0.075 calc(var(--hue-1) + 5));
+        --grid-line: oklch(from var(--accent) 0.88 calc(c * 0.64) calc(h + 8) / 0.14);
+        --grid-fine: oklch(from var(--accent) 0.88 calc(c * 0.64) calc(h + 8) / 0.055);
+        --ink: oklch(0.96 0.015 calc(var(--hue-1) - 22));
+        --muted: oklch(0.82 0.04 calc(var(--hue-1) - 20));
+        --subtle: oklch(0.68 0.05 calc(var(--hue-1) - 17));
+        --accent: oklch(0.83 0.11 calc(var(--hue-1) - 30));
+        --accent-2: oklch(0.8 0.1 calc(var(--hue-2) - 25));
+        --accent-3: oklch(0.86 0.13 calc(var(--hue-3) + 20));
+        --accent-fg: oklch(0.24 0.075 calc(var(--hue-1) + 5));
         --ink-mix: white;
 
-        --glass: oklch(0.28 0.075 257 / 0.85);
-        --glass-strong: oklch(0.26 0.075 257 / 0.97);
-        --glass-border: oklch(0.86 0.08 225 / 0.34);
-        --glass-border-hover: oklch(0.86 0.1 222 / 0.8);
-        --tile: oklch(0.3 0.07 257);
-        --tile-hover: oklch(0.34 0.07 257);
-        --hairline: oklch(0.9 0.05 225 / 0.16);
-        --shadow-lg: 0 18px 40px -20px oklch(0.1 0.05 257 / 0.7);
-        --ring: oklch(0.85 0.12 222);
+        --panel: oklch(0.28 0.075 calc(var(--hue-1) + 5));
+        --glass: color-mix(in oklab, var(--panel) 85%, transparent);
+        --glass-strong: oklch(from var(--panel) calc(l - 0.02) c h / 0.97);
+        --glass-border: oklch(from var(--accent) 0.86 calc(c * 0.73) calc(h + 3) / 0.34);
+        --glass-border-hover: oklch(from var(--accent) 0.86 calc(c * 0.9) h / 0.8);
+        --tile: oklch(from var(--panel) calc(l + 0.02) calc(c * 0.93) h);
+        --tile-hover: oklch(from var(--panel) calc(l + 0.06) calc(c * 0.93) h);
+        --hairline: oklch(from var(--accent) 0.9 calc(c * 0.45) calc(h + 3) / 0.16);
+        --shadow-lg: 0 18px 40px -20px oklch(from var(--bg) 0.1 calc(c * 0.67) h / 0.7);
+        --ring: oklch(from var(--accent) calc(l + 0.02) calc(c * 1.1) h);
 
-        --blob-1: oklch(0.4 0.1 250 / 0.45);
-        --blob-3: oklch(0.38 0.08 230 / 0.4);
-        --particle: oklch(0.88 0.08 222);
+        --blob-1: oklch(from var(--bg) 0.4 calc(c * 1.33) calc(h - 7) / 0.45);
+        --blob-3: oklch(from var(--bg) 0.38 calc(c * 1.07) calc(h - 27) / 0.4);
+        --particle: oklch(from var(--accent) 0.88 calc(c * 0.73) h);
     }
 
     /* ---- PAPER — cream stock, inked outlines, serif headings and a red accent; ink at night ---- */
     [data-style="paper"] {
         color-scheme: light;
+        --hue-1: 30;
+        --hue-2: 28;
+        --hue-3: 75;
         --bg: oklch(0.955 0.02 85);
         --backdrop-base: var(--bg);
         --page-bg: none;
@@ -365,33 +389,35 @@ TOKENS
         --ink: oklch(0.23 0.015 60);
         --muted: oklch(0.42 0.02 60);
         --subtle: oklch(0.56 0.02 65);
-        --accent: oklch(0.55 0.19 30);
-        --accent-2: oklch(0.42 0.13 28);
-        --accent-3: oklch(0.62 0.11 75);
+        --accent: oklch(0.55 0.19 var(--hue-1));
+        --accent-2: oklch(0.42 0.13 var(--hue-2));
+        --accent-3: oklch(0.62 0.11 var(--hue-3));
         --accent-fg: oklch(0.98 0.012 85);
         --ink-mix: black;
 
-        --glass: oklch(0.985 0.01 88);
-        --glass-strong: oklch(0.985 0.01 88 / 0.98);
-        --glass-border: oklch(0.23 0.015 60 / 0.88);
+        --panel: oklch(0.985 0.01 88);
+        --glass: var(--panel);
+        --glass-strong: color-mix(in oklab, var(--panel) 98%, transparent);
+        --glass-border: color-mix(in oklab, var(--ink) 88%, transparent);
         --glass-border-hover: var(--accent);
         --glass-highlight: transparent;
         --glass-blur: none;
-        --tile: oklch(0.965 0.016 85);
-        --tile-hover: oklch(0.93 0.03 80);
-        --hairline: oklch(0.23 0.015 60 / 0.2);
+        --tile: oklch(from var(--panel) calc(l - 0.02) min(c * 1.6, c + 0.006) h);
+        --tile-hover: oklch(from var(--panel) calc(l - 0.055) min(c * 3, c + 0.02) h);
+        --hairline: color-mix(in oklab, var(--ink) 20%, transparent);
         --shadow-sm: 0 0 #0000;
-        --shadow: 3px 3px 0 oklch(0.23 0.015 60 / 0.14);
-        --shadow-lg: 0 24px 50px -28px oklch(0.3 0.03 60 / 0.5);
-        --ring: oklch(0.55 0.19 30);
+        --shadow: 3px 3px 0 color-mix(in oklab, var(--ink) 14%, transparent);
+        --shadow-lg: 0 24px 50px -28px oklch(from var(--ink) 0.3 calc(c * 2) h / 0.5);
+        --ring: var(--accent);
 
-        --blob-1: oklch(0.9 0.04 80 / 0.55);
+        /* the paper's own blotches, from its colour */
+        --blob-1: oklch(from var(--bg) 0.9 min(c * 2, c + 0.02) calc(h - 5) / 0.55);
         --blob-2: transparent;
-        --blob-3: oklch(0.88 0.05 70 / 0.45);
+        --blob-3: oklch(from var(--bg) 0.88 min(c * 2.5, c + 0.03) calc(h - 15) / 0.45);
         --blob-4: transparent;
-        --particle: oklch(0.3 0.02 60 / 0.45);
+        --particle: oklch(from var(--ink) 0.3 c h / 0.45);
         --grain-opacity: 0.16;
-        --card-hue: 25;
+        --card-hue: calc(var(--hue-1) - 5);
         --card-chroma: 0.13;
 
         --radius-sm: 2px;
@@ -416,68 +442,72 @@ TOKENS
         --ink: oklch(0.93 0.02 85);
         --muted: oklch(0.76 0.02 80);
         --subtle: oklch(0.62 0.02 75);
-        --accent: oklch(0.72 0.15 38);
-        --accent-2: oklch(0.6 0.13 30);
-        --accent-3: oklch(0.78 0.1 80);
+        --accent: oklch(0.72 0.15 calc(var(--hue-1) + 8));
+        --accent-2: oklch(0.6 0.13 calc(var(--hue-2) + 2));
+        --accent-3: oklch(0.78 0.1 calc(var(--hue-3) + 5));
         --accent-fg: oklch(0.2 0.012 60);
         --ink-mix: white;
 
-        --glass: oklch(0.24 0.012 60);
-        --glass-strong: oklch(0.24 0.012 60 / 0.98);
-        --glass-border: oklch(0.93 0.02 85 / 0.55);
-        --tile: oklch(0.27 0.012 60);
-        --tile-hover: oklch(0.31 0.015 60);
-        --hairline: oklch(0.93 0.02 85 / 0.14);
+        --panel: oklch(0.24 0.012 60);
+        --glass-border: color-mix(in oklab, var(--ink) 55%, transparent);
+        --tile: oklch(from var(--panel) calc(l + 0.03) c h);
+        --tile-hover: oklch(from var(--panel) calc(l + 0.07) calc(c * 1.25) h);
+        --hairline: color-mix(in oklab, var(--ink) 14%, transparent);
         --shadow: 3px 3px 0 oklch(0 0 0 / 0.35);
         --shadow-lg: 0 24px 50px -24px oklch(0 0 0 / 0.8);
-        --ring: oklch(0.75 0.14 38);
+        --ring: oklch(from var(--accent) calc(l + 0.03) calc(c * 0.93) h);
 
-        --blob-1: oklch(0.3 0.03 70 / 0.5);
-        --blob-3: oklch(0.3 0.04 50 / 0.4);
-        --particle: oklch(0.9 0.02 85 / 0.35);
+        --blob-1: oklch(from var(--bg) 0.3 min(c * 2.5, c + 0.02) calc(h + 10) / 0.5);
+        --blob-3: oklch(from var(--bg) 0.3 min(c * 3.3, c + 0.03) calc(h - 10) / 0.4);
+        --particle: oklch(from var(--ink) 0.9 c h / 0.35);
         --grain-opacity: 0.12;
     }
 
     /* ---- NEON — a glowing grid floor, pink and cyan outlines; best at night ---- */
     [data-style="neon"] {
         color-scheme: light;
-        --bg: oklch(0.965 0.02 320);
+        --hue-1: 345;
+        --hue-2: 215;
+        --hue-3: 85;
+        --bg: oklch(0.965 0.02 calc(var(--hue-1) - 25));
         --backdrop-base: var(--bg);
-        --grid-line: oklch(0.65 0.24 340 / 0.35);
+        --grid-line: oklch(from var(--accent) 0.65 calc(c * 0.92) calc(h - 5) / 0.35);
         --page-bg:
             linear-gradient(var(--grid-line) 2px, transparent 2px) 0 0 / 100% 56px,
             linear-gradient(90deg, var(--grid-line) 2px, transparent 2px) 50% 0 / 72px 100%;
         --art-mask: linear-gradient(#000 0 0);
-        --ink: oklch(0.22 0.07 300);
-        --muted: oklch(0.42 0.08 305);
-        --subtle: oklch(0.56 0.07 305);
-        --accent: oklch(0.6 0.26 345);
-        --accent-2: oklch(0.62 0.15 215);
-        --accent-3: oklch(0.75 0.17 85);
+        --ink: oklch(0.22 0.07 calc(var(--hue-1) - 45));
+        --muted: oklch(0.42 0.08 calc(var(--hue-1) - 40));
+        --subtle: oklch(0.56 0.07 calc(var(--hue-1) - 40));
+        --accent: oklch(0.6 0.26 var(--hue-1));
+        --accent-2: oklch(0.62 0.15 var(--hue-2));
+        --accent-3: oklch(0.75 0.17 var(--hue-3));
         --accent-fg: oklch(0.99 0 0);
         --ink-mix: black;
 
-        --glass: oklch(1 0 0 / 0.7);
-        --glass-strong: oklch(0.99 0.01 320 / 0.94);
-        --glass-border: oklch(0.6 0.26 345 / 0.55);
-        --glass-border-hover: oklch(0.62 0.15 215 / 0.9);
+        --panel: oklch(1 0 0);
+        --glass: color-mix(in oklab, var(--panel) 70%, transparent);
+        --glass-strong: color-mix(in oklab, var(--panel) 94%, transparent);
+        --glass-border: color-mix(in oklab, var(--accent) 55%, transparent);
+        --glass-border-hover: color-mix(in oklab, var(--accent-2) 90%, transparent);
         --glass-highlight: transparent;
         --glass-blur: blur(12px) saturate(1.4);
-        --tile: oklch(1 0 0 / 0.6);
-        --tile-hover: oklch(1 0 0 / 0.9);
-        --hairline: oklch(0.6 0.2 330 / 0.22);
-        --shadow-sm: 0 0 10px -3px oklch(0.6 0.26 345 / 0.45);
-        --shadow: 0 0 22px -6px oklch(0.6 0.26 345 / 0.5);
-        --shadow-lg: 0 0 40px -10px oklch(0.6 0.26 345 / 0.45), 0 30px 60px -24px oklch(0.3 0.1 300 / 0.4);
-        --ring: oklch(0.62 0.15 215);
+        --tile: color-mix(in oklab, var(--panel) 60%, transparent);
+        --tile-hover: color-mix(in oklab, var(--panel) 90%, transparent);
+        --hairline: oklch(from var(--accent) 0.6 calc(c * 0.77) calc(h - 15) / 0.22);
+        --shadow-sm: 0 0 10px -3px color-mix(in oklab, var(--accent) 45%, transparent);
+        --shadow: 0 0 22px -6px color-mix(in oklab, var(--accent) 50%, transparent);
+        --shadow-lg: 0 0 40px -10px color-mix(in oklab, var(--accent) 45%, transparent),
+            0 30px 60px -24px oklch(from var(--ink) 0.3 calc(c * 1.4) h / 0.4);
+        --ring: var(--accent-2);
 
-        --blob-1: oklch(0.8 0.15 340 / 0.5);
-        --blob-2: oklch(0.85 0.1 210 / 0.5);
-        --blob-3: oklch(0.88 0.12 330 / 0.45);
-        --blob-4: oklch(0.75 0.15 300 / 0.4);
-        --particle: oklch(0.55 0.24 340);
+        --blob-1: oklch(from var(--accent) 0.8 calc(c * 0.58) calc(h - 5) / 0.5);
+        --blob-2: oklch(from var(--accent-2) 0.85 calc(c * 0.67) calc(h - 5) / 0.5);
+        --blob-3: oklch(from var(--accent) 0.88 calc(c * 0.46) calc(h - 15) / 0.45);
+        --blob-4: oklch(from var(--accent) 0.75 calc(c * 0.58) calc(h - 45) / 0.4);
+        --particle: oklch(from var(--accent) 0.55 calc(c * 0.92) calc(h - 5));
         --grain-opacity: 0.03;
-        --card-hue: 330;
+        --card-hue: calc(var(--hue-1) - 15);
         --card-chroma: 0.2;
 
         --radius-sm: 0.5rem;
@@ -498,76 +528,80 @@ TOKENS
     .theme-dark[data-style="neon"],
     .theme-dark [data-style="neon"] {
         color-scheme: dark;
-        --bg: oklch(0.14 0.04 295);
-        --grid-line: oklch(0.7 0.27 340 / 0.6);
-        --ink: oklch(0.97 0.02 320);
-        --muted: oklch(0.8 0.05 310);
-        --subtle: oklch(0.64 0.07 305);
-        --accent: oklch(0.74 0.24 345);
-        --accent-2: oklch(0.84 0.14 200);
-        --accent-3: oklch(0.9 0.17 95);
-        --accent-fg: oklch(0.14 0.04 295);
+        --bg: oklch(0.14 0.04 calc(var(--hue-1) - 50));
+        --grid-line: oklch(from var(--accent) 0.7 calc(c * 1.12) calc(h - 5) / 0.6);
+        --ink: oklch(0.97 0.02 calc(var(--hue-1) - 25));
+        --muted: oklch(0.8 0.05 calc(var(--hue-1) - 35));
+        --subtle: oklch(0.64 0.07 calc(var(--hue-1) - 40));
+        --accent: oklch(0.74 0.24 var(--hue-1));
+        --accent-2: oklch(0.84 0.14 calc(var(--hue-2) - 15));
+        --accent-3: oklch(0.9 0.17 calc(var(--hue-3) + 10));
+        --accent-fg: oklch(0.14 0.04 calc(var(--hue-1) - 50));
         --ink-mix: white;
 
-        --glass: oklch(0.17 0.045 295 / 0.68);
-        --glass-strong: oklch(0.16 0.045 295 / 0.95);
-        --glass-border: oklch(0.74 0.24 345 / 0.6);
-        --glass-border-hover: oklch(0.84 0.14 200 / 0.95);
-        --tile: oklch(0.2 0.05 295 / 0.6);
-        --tile-hover: oklch(0.25 0.06 295 / 0.8);
-        --hairline: oklch(0.74 0.2 330 / 0.22);
-        --shadow-sm: 0 0 12px -3px oklch(0.74 0.24 345 / 0.6);
-        --shadow: 0 0 26px -6px oklch(0.74 0.24 345 / 0.55);
-        --shadow-lg: 0 0 44px -8px oklch(0.74 0.24 345 / 0.5), 0 30px 60px -20px oklch(0 0 0 / 0.9);
-        --ring: oklch(0.84 0.14 200);
+        --panel: oklch(0.17 0.045 calc(var(--hue-1) - 50));
+        --glass: color-mix(in oklab, var(--panel) 68%, transparent);
+        --glass-strong: oklch(from var(--panel) calc(l - 0.01) c h / 0.95);
+        --glass-border: color-mix(in oklab, var(--accent) 60%, transparent);
+        --glass-border-hover: color-mix(in oklab, var(--accent-2) 95%, transparent);
+        --tile: oklch(from var(--panel) calc(l + 0.03) calc(c * 1.1) h / 0.6);
+        --tile-hover: oklch(from var(--panel) calc(l + 0.08) calc(c * 1.33) h / 0.8);
+        --hairline: oklch(from var(--accent) l calc(c * 0.83) calc(h - 15) / 0.22);
+        --shadow-sm: 0 0 12px -3px color-mix(in oklab, var(--accent) 60%, transparent);
+        --shadow: 0 0 26px -6px color-mix(in oklab, var(--accent) 55%, transparent);
+        --shadow-lg: 0 0 44px -8px color-mix(in oklab, var(--accent) 50%, transparent), 0 30px 60px -20px oklch(0 0 0 / 0.9);
 
-        --blob-1: oklch(0.45 0.25 340 / 0.45);
-        --blob-2: oklch(0.5 0.15 200 / 0.3);
-        --blob-3: oklch(0.5 0.24 330 / 0.4);
-        --blob-4: oklch(0.4 0.2 290 / 0.4);
-        --particle: oklch(0.9 0.08 200);
+        --blob-1: oklch(from var(--accent) 0.45 c calc(h - 5) / 0.45);
+        --blob-2: oklch(from var(--accent-2) 0.5 calc(c * 1.07) h / 0.3);
+        --blob-3: oklch(from var(--accent) 0.5 c calc(h - 15) / 0.4);
+        --blob-4: oklch(from var(--accent) 0.4 calc(c * 0.83) calc(h - 55) / 0.4);
+        --particle: oklch(from var(--accent-2) 0.9 calc(c * 0.57) h);
         --grain-opacity: 0.05;
     }
 
     /* ---- BOLD — chunky borders, hard shadows, bright tiles on a dotted page ---- */
     [data-style="bold"] {
         color-scheme: light;
+        --hue-1: 268;
+        --hue-2: 355;
+        --hue-3: 100;
         --bg: oklch(0.965 0.035 95);
         --backdrop-base: var(--bg);
-        --dot: oklch(0.25 0.02 270 / 0.2);
+        --dot: oklch(from var(--ink) 0.25 c h / 0.2);
         --page-bg: radial-gradient(var(--dot) 1.3px, transparent 1.7px) 0 0 / 22px 22px;
         --art-mask: linear-gradient(#000 0 0);
         --ink: oklch(0.2 0.02 270);
         --muted: oklch(0.36 0.02 270);
         --subtle: oklch(0.5 0.02 270);
-        --accent: oklch(0.52 0.25 268);
-        --accent-2: oklch(0.68 0.23 355);
-        --accent-3: oklch(0.89 0.17 100);
+        --accent: oklch(0.52 0.25 var(--hue-1));
+        --accent-2: oklch(0.68 0.23 var(--hue-2));
+        --accent-3: oklch(0.89 0.17 var(--hue-3));
         --accent-fg: oklch(0.99 0 0);
         --ink-mix: black;
 
-        --glass: oklch(1 0 0);
-        --glass-strong: oklch(1 0 0);
+        --panel: oklch(1 0 0);
+        --glass: var(--panel);
+        --glass-strong: var(--panel);
         --glass-border: var(--ink);
         --glass-border-hover: var(--ink);
         --glass-highlight: transparent;
         --glass-blur: none;
-        --tile: oklch(1 0 0);
-        --tile-hover: oklch(0.97 0.04 95);
-        --hairline: oklch(0.2 0.02 270 / 0.22);
+        --tile: var(--panel);
+        --tile-hover: color-mix(in oklab, var(--panel) 80%, var(--accent-3));
+        --hairline: color-mix(in oklab, var(--ink) 22%, transparent);
         --hard: var(--ink); /* the colour of the hard shadows */
         --shadow-sm: 2px 2px 0 var(--hard);
         --shadow: 5px 5px 0 var(--hard);
         --shadow-lg: 8px 8px 0 var(--hard);
-        --ring: oklch(0.52 0.25 268);
+        --ring: var(--accent);
 
         --blob-1: transparent;
         --blob-2: transparent;
         --blob-3: transparent;
         --blob-4: transparent;
-        --particle: oklch(0.2 0.02 270 / 0.55);
+        --particle: color-mix(in oklab, var(--ink) 55%, transparent);
         --grain-opacity: 0;
-        --card-hue: 265;
+        --card-hue: calc(var(--hue-1) - 3);
         --card-chroma: 0.2;
 
         --border-w: 2px;
@@ -592,26 +626,25 @@ TOKENS
     .theme-dark [data-style="bold"] {
         color-scheme: dark;
         --bg: oklch(0.21 0.02 270);
-        --dot: oklch(0.95 0.02 95 / 0.12);
+        --dot: oklch(from var(--ink) 0.95 c h / 0.12);
         --ink: oklch(0.97 0.015 95);
         --muted: oklch(0.82 0.015 95);
         --subtle: oklch(0.66 0.015 95);
-        --accent: oklch(0.72 0.18 268);
-        --accent-2: oklch(0.75 0.2 355);
-        --accent-3: oklch(0.9 0.17 100);
+        --accent: oklch(0.72 0.18 var(--hue-1));
+        --accent-2: oklch(0.75 0.2 var(--hue-2));
+        --accent-3: oklch(0.9 0.17 var(--hue-3));
         --accent-fg: oklch(0.2 0.02 270);
         --ink-mix: white;
 
-        --glass: oklch(0.26 0.02 270);
-        --glass-strong: oklch(0.26 0.02 270);
+        --panel: oklch(0.26 0.02 270);
         --glass-border-hover: var(--accent-3);
-        --tile: oklch(0.29 0.02 270);
-        --tile-hover: oklch(0.33 0.025 270);
-        --hairline: oklch(0.97 0.015 95 / 0.2);
+        --tile: oklch(from var(--panel) calc(l + 0.03) c h);
+        --tile-hover: oklch(from var(--panel) calc(l + 0.07) calc(c * 1.25) h);
+        --hairline: color-mix(in oklab, var(--ink) 20%, transparent);
         --hard: var(--accent-3);
         --shadow-lg: 8px 8px 0 oklch(0 0 0 / 0.6);
         --ring: var(--accent-3);
-        --particle: oklch(0.97 0.015 95 / 0.5);
+        --particle: color-mix(in oklab, var(--ink) 50%, transparent);
     }
 
     /* elements carrying an environment set --env inline; --env-ink is its readable text color in this theme */

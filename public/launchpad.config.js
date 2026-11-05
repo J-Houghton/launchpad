@@ -5,7 +5,7 @@
 // Each card holds tiles, each with a "name", a "url" and an optional "label" (a short tag).
 // For a launch page, turn on "useColumns" and list your "columns" (e.g. DEV, TEST, PROD); each
 // tile then names its "column", and they line up from card to card. "layout" places everything
-// on a 12-column grid, and "look" sets its style and background. See the README for examples.
+// on a 12-column grid, and "look" sets its style, background and colours. See the README for examples.
 //
 // This sample also turns on two of the example extensions in the extensions folder (the search box and
 // notes, under "widgets" → "added"). Take them out of "extensions" if you don't want them.

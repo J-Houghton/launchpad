@@ -31,8 +31,8 @@ It builds to **one self-contained `index.html`** that runs straight from disk, w
   - **Neon**: a glowing grid at night.
   - **Bold**: chunky borders and hard shadows.
 
-  Behind the page there can be drifting particles, the style's backdrop alone, or a plain colour. Pick a look in Settings → My view; **Make it everyone's** turns yours into the page's own.
-- **My view**: personal choices stay in your browser and never change the page for anyone else. These are your look, less motion, hidden cards and pins.
+  Behind the page there can be drifting particles, the style's backdrop alone, or a plain colour. Each style comes with a few colour combos to pick from, and any of its six colours (background, panels, text and three accents) can be fine-tuned. Every style keeps its own colours, and its glow, borders and particles follow them. Pick a look in Settings → My view; **Make it everyone's** turns yours into the page's own.
+- **My view**: personal choices stay in your browser and never change the page for anyone else. These are your look and colours, less motion, hidden cards and pins.
 - **First-run guide**: an empty page walks you through naming it and choosing "just links" or a set of columns. Then you add a few cards or paste them from a spreadsheet. Or start from an example: a home page, or a team's launch page. Settings → Edit page → **File** loads the examples any time, to look around.
 - A few modern touches: view transitions, anchor-positioned menus and scroll-driven effects. All of them calm down when your device asks for less motion, or when you choose it in My view.
 
@@ -54,6 +54,10 @@ Open `dist/index.html` in your browser. To work on the code, `npm run dev` start
 Everything lives in `launchpad.config.js` next to `index.html`. The source copy is `public/launchpad.config.js`. Change it and reload the page; no rebuild is needed.
 
 - **In the page:** open Settings → **Edit page**, make your changes, then **Save to file**. Its four tabs are **Cards** (with the columns, if you use them), **Layout**, **Widgets** and **Page** (title, logo, header links, status checks and custom CSS). The **File** menu opens or downloads a config, or loads an example. In Chrome and Edge you pick the file once, and later saves go straight to it. Other browsers download a new copy for you to put next to `index.html`. **Save** on its own keeps changes in this browser only.
+- **Yours or everyone's?**
+  - **My view** is only ever yours. It's kept in this browser and never written to `launchpad.config.js`.
+  - **Edit page** changes the page itself. **Save to file** writes `launchpad.config.js`, which is what everyone who opens the page gets, and what you share. **Save** keeps the change in this browser until you save to the file.
+  - **Make it everyone's** in My view copies your look into Edit page, ready to save to the file.
 - **By hand:** the file is plain JSON after `window.LAUNCHPAD_CONFIG =`, so keep it valid JSON. The bundled sample is a personal home page, with two of the example extensions turned on (a search box and notes):
 
 | Key | What it sets |
@@ -67,7 +71,7 @@ Everything lives in `launchpad.config.js` next to `index.html`. The source copy 
 | `cards` | `id`, `name`, `description`, `badge`, `group`, `links` (buttons under the name), `health: false` to skip its checks, `span` and `newRow` (see Layout below), and `tiles` (below) |
 | `widgets` | `greeting`; `clock` (`zones`; `"timeZone": "local"` follows the viewer); `weather` (`place`, `latitude`, `longitude`, `units`); `added`, your own widgets (see Widgets below) |
 | `layout` | `density` (`"comfortable"` or `"compact"`) and `sections`: each section once, in page order, as `{ "id", "span", "newRow", "hidden" }` |
-| `look` | the page's look: `theme` (`"system"`, `"light"` or `"dark"`), `style` (`"aurora"`, `"classic"`, `"blueprint"`, `"paper"`, `"neon"` or `"bold"`) and `background` (`"particles"`, `"still"` or `"plain"`). Anyone's own choices in My view come first. Plus `css`, the page's custom CSS (see below). |
+| `look` | the page's look: `theme` (`"system"`, `"light"` or `"dark"`), `style` (`"aurora"`, `"classic"`, `"blueprint"`, `"paper"`, `"neon"` or `"bold"`) and `background` (`"particles"`, `"still"` or `"plain"`). Anyone's own choices in My view come first. Plus `colors`, the page's own colours for any style, and `css`, its custom CSS (see below). |
 | `extensions` | extension files to load, as paths beside `index.html`, e.g. `"extensions/notes.js"` (see Extensions below) |
 
 On a home page, a tile is `{ "name": "Recipe box", "url": "https://…", "label": "WEB" }`. `label` is the small tag and is optional; so are `color` and `id`. Give an `id` if you want pins to survive renaming the tile.
@@ -147,6 +151,29 @@ Values are escaped. Only simple tags are kept, plus their class names for custom
 
 Opened from a file, the page can only read servers that let other sites read them (CORS). Most public APIs do; for your own, the server needs to send `Access-Control-Allow-Origin`. When you open someone else's config in Settings, the page asks before keeping any widgets it adds that show other sites.
 
+### Colours
+
+Settings → My view → **Colours** starts with a few ready-made combos for the style you're using, such as Aurora's Lagoon, Sunset and Ocean, or Paper's blue and green inks. A combo keeps the style's own look and works in light and dark. The glow, borders, particles and cards' colours all follow it.
+
+Below the combos, **Fine-tune** lets you change any of the style's six colours in a picker: background, panels, text, accent, second accent and highlight. Fine-tuning is kept separately for light and dark. Each style keeps its own colours.
+
+**Make it everyone's** writes them into the page's look:
+
+```json
+"look": {
+  "theme": "system", "style": "aurora", "background": "particles",
+  "colors": {
+    "aurora": { "hues": [200, 250, 25], "light": { "accent": "#0a9396" }, "dark": { "bg": "#0b1d26" } }
+  }
+}
+```
+
+- `hues` is the combo: the hues of the accent, second accent and highlight, from 0 to 360. Classic's are HSL hues; the other styles use OKLCH hues.
+- `light` and `dark` hold single colours as `#rrggbb`. The keys are `bg`, `panel`, `ink` (text), `accent`, `accent-2` and `accent-3`.
+- Anything you leave out is the style's own.
+
+If the colours ever make the page hard to read, add `?safe` to the end of its address to leave them off.
+
 ### Custom CSS
 
 For anything the styles don't cover, add your own CSS in Settings → Edit page → Page → **Custom CSS**. The page behind the settings window shows it as you type. Launchpad's own styles sit in cascade layers and yours come after them, so a plain selector is enough to win. In `launchpad.config.js` it's `look.css`, one line per entry:
@@ -166,7 +193,7 @@ Most changes are just a variable. Set them on `:root`, on `.theme-dark` for dark
 
 | Variables | |
 | --- | --- |
-| Colours | `--accent`, `--accent-2`, `--accent-3`, `--ink` (text), `--muted`, `--bg`, `--glass` (cards and panels), `--glass-border`, `--tile`, `--hairline`, `--ring` (focus) |
+| Colours | each style's six: `--bg`, `--panel`, `--ink` (text), `--accent`, `--accent-2`, `--accent-3`. These follow from them: `--muted`, `--glass` (cards and panels), `--glass-border`, `--tile`, `--hairline`, `--ring` (focus) |
 | Shapes | `--radius-sm`, `--radius`, `--radius-lg`, `--radius-full`, `--border-w`, `--mark-radius` (card badges), `--shadow-sm`, `--shadow`, `--shadow-lg` |
 | Type | `--font-heading`, `--font-label`, `--font-numeric`, `--font-display` (the greeting), `--title-size`, `--section-size`, `--heading-weight`. The bundled faces are `--font-sans` (Inter), `--font-serif` (Instrument Serif) and `--font-mono`. |
 | Backdrop | `--page-bg` (a pattern), `--blob-1` to `--blob-4` (the glow), `--particle`, `--grain-opacity` |
@@ -181,7 +208,9 @@ These hooks are kept stable from version to version:
 | `[data-section="…"]` | `greeting`, `clock`, `weather`, `pinned`, `recent`, `cards`, or an added widget's `id` |
 | `:root[data-style]`, `.theme-dark`, `:root[data-density="compact"]`, `:root[data-motion="reduced"]` | the look in effect |
 
-If your CSS ever hides the way back to Settings, open the page with `?safe` on the end of its address (`index.html?safe`). Custom CSS stays off until you take `?safe` away again.
+If your CSS ever hides the way back to Settings, open the page with `?safe` on the end of its address (`index.html?safe`). Custom CSS, colours and extensions stay off until you take `?safe` away again.
+
+The examples in Settings use your own page's names: one of your cards and tiles, a section, and your style.
 
 When you open someone else's config file in Settings, the page asks before keeping any CSS in it. CSS can make a page look like something it isn't, and can load images and fonts from other sites.
 
