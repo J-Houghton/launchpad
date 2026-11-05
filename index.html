@@ -35,10 +35,32 @@
         root.dataset.density = oneOf(page.layout?.density, ['comfortable', 'compact'], 'comfortable');
 
         // the page's custom CSS (src/lib/custom-css.ts), unless ?safe is in the address
+        const safe = new URLSearchParams(location.search).has('safe');
         const css = [].concat(look.css ?? []).filter(line => typeof line === 'string').join('\n');
-        if (css.trim() && !new URLSearchParams(location.search).has('safe')) {
+        if (css.trim() && !safe) {
           const style = Object.assign(document.createElement('style'), { id: 'launchpad-custom-css', textContent: css });
           document.head.append(style);
+        }
+
+        // colours for each style: a combo's three hues, then single colours, light and dark apart; the page's,
+        // with yours over them, and a combo of yours starting the style afresh (src/lib/colors.ts)
+        const isHex = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+        const isHues = v => Array.isArray(v) && v.length === 3 && v.every(h => typeof h === 'number' && Number.isFinite(h));
+        const rules = [];
+        for (const name of ['aurora', 'classic', 'blueprint', 'paper', 'neon', 'bold']) {
+          const ours = look.colors?.[name] ?? {}, yours = mine.colors?.[name] ?? {};
+          const hues = isHues(yours.hues) ? yours.hues : isHues(ours.hues) ? ours.hues : null;
+          if (hues) rules.push(`[data-style="${name}"] { ${hues.map((h, i) => `--hue-${i + 1}: ${h};`).join(' ')} }`);
+          for (const shade of ['light', 'dark']) {
+            const c = { ...(isHues(yours.hues) ? {} : ours[shade]), ...yours[shade] };
+            const set = ['bg', 'panel', 'ink', 'accent', 'accent-2', 'accent-3'].filter(slot => isHex(c[slot])).map(slot => `--${slot}: ${c[slot]};`);
+            if (isHex(c.ink)) set.push(`--muted: color-mix(in oklab, ${c.ink} 72%, var(--bg));`, `--subtle: color-mix(in oklab, ${c.ink} 52%, var(--bg));`);
+            if (isHex(c.accent)) set.push(`--accent-fg: oklch(from ${c.accent} clamp(0.15, (0.6 - l) * 1000, 0.99) 0 0);`);
+            if (set.length) rules.push(`:root.theme-${shade}[data-style="${name}"], .theme-${shade} [data-style="${name}"]:not([data-combo]) { ${set.join(' ')} }`);
+          }
+        }
+        if (rules.length && !safe) {
+          document.head.append(Object.assign(document.createElement('style'), { id: 'launchpad-colors', textContent: rules.join('\n') }));
         }
       })();
     </script>

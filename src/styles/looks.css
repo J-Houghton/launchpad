@@ -104,7 +104,7 @@ reach the previews in Settings; a preview's own touches start at .style-preview[
     }
 
     .theme-dark[data-style="neon"] .hero-title .type-live {
-        color: oklch(0.95 0.06 345);
+        color: oklch(from var(--accent) 0.95 calc(c * 0.25) h);
         text-shadow: 0 0 6px var(--accent), 0 0 24px var(--accent), 0 0 60px color-mix(in oklch, var(--accent) 60%, transparent);
     }
 

@@ -21,6 +21,7 @@ import { arrange } from './lib/arrange.js';
 import { safeMode } from './lib/custom-css.js';
 import { startExtensions } from './lib/extensions.js';
 import { health } from './lib/health.js';
+import { look } from './lib/look.js';
 import { layoutStyle, moveAmong, place } from './lib/layout.js';
 import type { SortMove } from './lib/sortable.js';
 import { StoreController } from './lib/store-controller.js';
@@ -39,7 +40,9 @@ export class AppShell extends LitElement {
     super.connectedCallback();
     health.start();
     startExtensions();
-    if (safeMode && (config.look.css || config.extensions.length)) toast('Safe mode: the page\'s custom CSS and extensions are off');
+    if (safeMode && (config.look.css || config.extensions.length || Object.keys(look.colors).length)) {
+      toast('Safe mode: custom CSS, colours and extensions are off');
+    }
   }
 
   #content(id: SectionId) {

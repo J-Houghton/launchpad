@@ -1,6 +1,6 @@
 // src/components/settings-panel.ts
 // Settings, in two modes:
-//   My view   — just for you: your look, which cards show, pins + history. Applies instantly, saved in this browser.
+//   My view   — just for you: your look and colours, which cards show, pins + history. Applies instantly, saved in this browser.
 //               "Make it everyone's" copies your look into the page.
 //   Edit page — the page itself, in four tabs: Cards (and their columns), Layout, Widgets, and Page (title, header
 //               links, status checks, custom CSS). A draft until saved; "Save to file" writes launchpad.config.js
@@ -10,12 +10,15 @@ import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import {
-  COLUMN_PRESETS, LINK_ICONS, NEW_COLUMN_COLORS, STYLES, cardColor, cardHue, cityOf, config, hostOf, isHttpUrl, validTimeZone,
+  COLOR_SLOTS, COLUMN_PRESETS, EXAMPLE_ZONE, LINK_ICONS, NEW_COLUMN_COLORS, STYLES, cardColor, cardHue, cityOf, config, hostOf, isHttpUrl, validTimeZone,
   MAX_CSS, MAX_TEMPLATE, SECTION_IDS, isExtensionPath, sectionName, type AddedWidget, type Background, type CardConfig,
   type DataWidget, type ExtensionWidget, type ColumnDef, type Density, type LaunchpadConfig, type LinkIcon,
   type LinkItem, type SectionId, type Style, type ThemeMode, type TileConfig,
 } from '../config.js';
 import { arrange } from '../lib/arrange.js';
+import { COLOR_INFO, contrast, shownColors } from '../lib/colors.js';
+import { COMBOS, sameHues } from '../lib/combos.js';
+import './color-picker.js';
 import { EXAMPLES, type Example } from '../lib/examples.js';
 import { SPANS, moveCard, place, setNewRow, setSpan } from '../lib/layout.js';
 import { look, type Motion } from '../lib/look.js';
@@ -172,6 +175,40 @@ const nameOf = <T>(options: Option<T>[], id: T) => options.find(o => o.id === id
 const TIME_ZONES = Intl.supportedValuesOf?.('timeZone') ?? [];
 
 const clone = <T>(value: T): T => structuredClone(value);
+
+/**
+ * Names to use in a data widget's template examples: from the data that came back when there is some
+ * (a value, one inside another, a list with a value in each item, and a date), or else made-up ones.
+ */
+function templateExamples(data: unknown) {
+  const made = { value: 'name', nested: 'owner.login', list: 'items', item: 'name', when: 'updated', real: false };
+  const isValue = (v: unknown) => typeof v === 'string' || typeof v === 'number';
+  const isDate = (v: unknown) => typeof v === 'string' && /^\d{4}-\d\d-\d\dT/.test(v);
+  const entries = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.entries(v) : []);
+  const plain = (v: unknown) => isValue(v) && !isDate(v);
+  const name = (key: string) => /^[A-Za-z_$][\w$-]*$/.test(key);
+
+  const top = entries(data).filter(([k]) => name(k));
+  const lists: [string, unknown[]][] = Array.isArray(data) ? [['.', data]] : top.filter((e): e is [string, unknown[]] => Array.isArray(e[1]) && e[1].length > 0);
+  const [list, items] = lists[0] ?? [];
+  const first = items?.[0];
+  const inItem = entries(first).filter(([k]) => name(k));
+  const inside = top.map(([k, v]) => [k, entries(v).find(([n, x]) => name(n) && plain(x))?.[0]] as const).find(([, n]) => n);
+  const inFirst = inItem.find(([, v]) => plain(v))?.[0];
+  const found = {
+    // outside the list, a value in its first item is reached through it: items.0.title
+    value: top.find(([, v]) => plain(v))?.[0] ?? (inFirst && `${list === '.' ? '' : `${list}.`}0.${inFirst}`),
+    nested: inside ? `${inside[0]}.${inside[1]}` : undefined,
+    list,
+    item: isValue(first) ? '.' : inItem.find(([, v]) => plain(v))?.[0],
+    when: top.find(([, v]) => isDate(v))?.[0] ?? inItem.find(([, v]) => isDate(v))?.[0],
+  };
+  if (!found.value && !found.list) return made;
+  return {
+    value: found.value ?? made.value, nested: found.nested ?? made.nested, list: found.list ?? made.list,
+    item: found.item ?? made.item, when: found.when ?? made.when, real: true,
+  };
+}
 
 let instance: SettingsPanel | undefined;
 
@@ -405,7 +442,7 @@ export class SettingsPanel extends LitElement {
     const { clock, weather } = d.widgets;
     for (const [i, zone] of clock.zones.entries()) {
       if (!validTimeZone(zone.timeZone.trim()) || !zone.timeZone.trim()) {
-        return { tab: 'widgets', field: `zone:${i}:tz`, message: 'Pick a time zone from the list, e.g. America/Chicago.' };
+        return { tab: 'widgets', field: `zone:${i}:tz`, message: `Pick a time zone from the list, e.g. ${EXAMPLE_ZONE}.` };
       }
     }
     if (!d.layout.sections.find(x => x.id === 'weather')?.hidden && !weather.place) {
@@ -1181,9 +1218,76 @@ export class SettingsPanel extends LitElement {
       </div>`;
   }
 
-  /** "Blueprint · System theme · Still background" */
+  /** "Blueprint · System theme · Still background", and "· own colours" when it has some */
   #lookSummary(l = config.look) {
-    return `${STYLE_INFO[l.style].name} · ${nameOf(THEMES, l.theme)} theme · ${nameOf(this.#backgrounds(), l.background)} background`;
+    const own = l.colors?.[l.style] ? ' · own colours' : '';
+    return `${STYLE_INFO[l.style].name} · ${nameOf(THEMES, l.theme)} theme · ${nameOf(this.#backgrounds(), l.background)} background${own}`;
+  }
+
+  /**
+   * The style's colours: ready-made combos to start from (each previewed in the style itself, light or dark as
+   * the page is), then any of its six colours fine-tuned in a picker. Yours apply at once.
+   */
+  #colors() {
+    const shown = shownColors();
+    const mine = look.myColors;
+    const style = STYLE_INFO[look.style].name;
+    const hues = look.hues;
+    const readable = Math.min(contrast(shown.ink, shown.bg), contrast(shown.ink, shown.panel));
+    return html`
+      <section class="settings-group colors-group">
+        <h3 class="field-label">Colours <span class="field-hint">for ${style}</span></h3>
+        <div class="combos" role="radiogroup" aria-label="Colour combos for ${style}">
+          ${COMBOS[look.style].map(combo => html`
+            <label class="combo">
+              <input type="radio" name="combo" .checked=${sameHues(combo.hues, hues)} @change=${() => look.setHues(combo.hues)}>
+              <span class="combo-preview" data-style=${look.style} data-combo aria-hidden="true"
+                    style=${combo.hues.map((h, i) => `--hue-${i + 1}: ${h};`).join(' ')}>
+                <span class="combo-panel">
+                  <span class="combo-line"></span>
+                  <span class="combo-dots"><i></i><i></i><i></i></span>
+                </span>
+              </span>
+              <span class="combo-name">${combo.name}${combo.id === 'original' ? html` <span class="style-tag">Original</span>` : nothing}</span>
+            </label>`)}
+        </div>
+
+        <h4 class="colors-sub">Fine-tune <span class="field-hint">${style}, ${look.theme}</span></h4>
+        <div class="swatches">
+          ${COLOR_SLOTS.map(slot => html`
+            <div class="swatch" ?data-mine=${!!mine[slot]}>
+              <button class="swatch-chip" type="button" popovertarget="color-${slot}" title=${COLOR_INFO[slot].hint}
+                      aria-label="${COLOR_INFO[slot].name}: ${shown[slot]}"
+                      style="--swatch: ${shown[slot]}; anchor-name: --color-${slot}"></button>
+              ${mine[slot] ? html`
+                <button class="swatch-reset" type="button" title="Back to the combo's"
+                        aria-label="Put the combo's ${COLOR_INFO[slot].name.toLowerCase()} colour back"
+                        @click=${() => look.setColor(slot, undefined)}>${icon(X)}</button>` : nothing}
+              <span class="swatch-name">${COLOR_INFO[slot].name}</span>
+              <div id="color-${slot}" class="tile-menu settings-menu color-menu" popover style="position-anchor: --color-${slot}">
+                <div class="color-menu-head">
+                  <strong>${COLOR_INFO[slot].name}</strong>
+                  <span class="field-hint">${COLOR_INFO[slot].hint}</span>
+                </div>
+                <color-picker .value=${shown[slot]} label=${COLOR_INFO[slot].name}
+                              @pick=${(e: CustomEvent<string>) => look.setColor(slot, e.detail)}></color-picker>
+                ${mine[slot] ? html`
+                  <button class="link-btn color-menu-reset" type="button" @click=${() => look.setColor(slot, undefined)}>
+                    ${icon(RotateCcw)} Back to the combo's</button>` : nothing}
+              </div>
+            </div>`)}
+        </div>
+        ${readable < 3 ? html`
+          <div class="look-note" role="note">
+            ${icon(TriangleAlert)}<span>The text may be hard to read on these colours.</span>
+          </div>` : nothing}
+        ${safeMode ? html`
+          <div class="look-note" role="note">
+            ${icon(TriangleAlert)}<span>Safe mode is on (<code>?safe</code> in the address), so the page is in its style's own colours.</span>
+          </div>` : nothing}
+        <p class="field-hint">A combo sets ${style}'s colours in light and dark, and its glow, borders and particles follow.
+          Fine-tuning is for ${look.theme} only; each style keeps its own.</p>
+      </section>`;
   }
 
   /** The built-in backgrounds, then any that extensions add. */
@@ -1195,16 +1299,40 @@ export class SettingsPanel extends LitElement {
 
   /** Your look becomes the page's (once saved), for everyone who hasn't picked their own. */
   #makeLookEveryones = () => {
-    this.#edit(() => Object.assign(this.draft.look, { theme: look.themeMode, style: look.style, background: look.background }));
+    this.#edit(() => {
+      const colors = look.colors;
+      Object.assign(this.draft.look, { theme: look.themeMode, style: look.style, background: look.background, colors });
+      if (!Object.keys(colors).length) delete this.draft.look.colors;
+    });
     this.mode = 'edit';
     this.tab = 'page';
-    toast('Your look is now the page\'s — save to share it with everyone');
+    toast('Copied into the page\'s look. Save to file to share it with everyone');
+    // show where it went, and that it isn't saved yet
+    void this.updateComplete.then(() => this.querySelector('.look-card')?.scrollIntoView({ block: 'center', behavior: look.reducedMotion ? 'auto' : 'smooth' }));
   };
+
+  /** Whether the page's look has changed here since it was last saved. */
+  #lookChanged() {
+    const pick = ({ theme, style, background, colors }: LaunchpadConfig['look']) => JSON.stringify([theme, style, background, colors ?? {}]);
+    return pick(this.draft.look) !== pick(config.look);
+  }
+
+  /** Real names from this page for the custom CSS examples, so they can be tried as they are. */
+  #cssExamples() {
+    const d = this.draft;
+    const card = d.cards.find(c => c.tiles.length) ?? d.cards[0];
+    // a tile in a column goes by the column's id, so the example is one that isn't
+    const tile = d.cards.flatMap(c => c.tiles).find(t => !t.column && t.id && t.name);
+    const column = d.useColumns ? d.columns[0] : undefined;
+    const section = d.layout.sections.find(s => !s.hidden && s.id !== 'cards')?.id ?? 'greeting';
+    return { card, tile, column, section, group: d.groups[0]?.id ?? 'other', style: d.look.style };
+  }
 
   /** Custom CSS, folded away at the foot of the Page tab. */
   #customCss() {
     const l = this.draft.look;
-    const cardId = this.draft.cards[0]?.id ?? 'billing';
+    const ex = this.#cssExamples();
+    const cardId = ex.card?.id ?? 'billing';
     const code = (s: string) => html`<code>${s}</code> `;
     return html`
       <details class="fold advanced custom-css" ?open=${this.#advancedOpen}>
@@ -1216,7 +1344,9 @@ export class SettingsPanel extends LitElement {
         <div class="fold-body">
         <p class="field-hint">The page behind shows it as you type. It comes after Launchpad's own styles, so plain
           selectors win. Set variables like <code>--accent</code> or <code>--radius</code> on <code>:root</code>, or aim
-          at one card with <code>[data-card="${cardId}"]</code>.</p>
+          at one card: ${ex.card
+            ? html`your “${ex.card.name || ex.card.id}” card is <code>[data-card="${ex.card.id}"]</code>.`
+            : html`<code>[data-card="its-id"]</code>, once you've added some.`}</p>
         ${safeMode ? html`
           <div class="look-note" role="note">
             ${icon(TriangleAlert)}
@@ -1231,7 +1361,8 @@ export class SettingsPanel extends LitElement {
           <summary>Variables and hooks</summary>
           <dl class="css-ref">
             <dt>Colours</dt>
-            <dd>${['--accent', '--accent-2', '--accent-3', '--ink', '--muted', '--bg', '--glass', '--glass-border', '--tile', '--hairline', '--ring'].map(code)}</dd>
+            <dd>${['--bg', '--panel', '--ink', '--accent', '--accent-2', '--accent-3'].map(code)} — each style's own, and the rest
+              follow them: ${['--muted', '--glass', '--glass-border', '--tile', '--hairline', '--ring'].map(code)}</dd>
             <dt>Shapes</dt>
             <dd>${['--radius-sm', '--radius', '--radius-lg', '--radius-full', '--border-w', '--mark-radius', '--shadow'].map(code)}</dd>
             <dt>Type</dt>
@@ -1240,15 +1371,17 @@ export class SettingsPanel extends LitElement {
             <dt>Backdrop</dt>
             <dd>${['--page-bg', '--blob-1', '--blob-2', '--blob-3', '--blob-4', '--particle', '--grain-opacity'].map(code)}</dd>
             <dt>A card</dt>
-            <dd><code>[data-card="id"]</code> — its <code>--hue</code> (0–360) colours its badge and tiles</dd>
+            <dd><code>[data-card="${cardId}"]</code> — its <code>--hue</code> (0–360) colours its badge and tiles</dd>
             <dt>A tile</dt>
-            <dd><code>[data-tile="id"]</code> or <code>[data-column="id"]</code> — its <code>--env</code> is its colour</dd>
+            <dd>${ex.tile || !ex.column ? html`<code>[data-tile="${ex.tile?.id ?? 'recipe-box'}"]</code>` : nothing}${ex.tile && ex.column
+              ? ' or ' : nothing}${ex.column ? html`<code>[data-column="${ex.column.id}"]</code> (each ${ex.column.label} tile)` : nothing}
+              — its <code>--env</code> is its colour</dd>
             <dt>Also</dt>
-            <dd>${['[data-group="id"]', '[data-section="greeting"]', ':root[data-style="paper"]', '.theme-dark', ':root[data-density="compact"]'].map(code)}</dd>
+            <dd>${[`[data-group="${ex.group}"]`, `[data-section="${ex.section}"]`, `:root[data-style="${ex.style}"]`, '.theme-dark', ':root[data-density="compact"]'].map(code)}</dd>
           </dl>
           ${this.draft.cards.length ? html`
-            <p class="field-hint">Cards on this page: ${this.draft.cards.map(c => code(c.id))}. A tile's id comes from its name
-              (e.g. <code>recipe-box</code>), or is its column's.</p>` : nothing}
+            <p class="field-hint">Cards on this page: ${this.draft.cards.map(c => code(c.id))}. A tile's id comes from its
+              name${ex.tile ? html` (“${ex.tile.name}” is <code>${ex.tile.id}</code>)` : nothing}, or is its column's.</p>` : nothing}
           <p class="field-hint">If your CSS ever hides the way back here, open the page with <code>?safe</code> on the end of
             its address to leave it off.</p>
         </details>
@@ -1358,7 +1491,7 @@ export class SettingsPanel extends LitElement {
               ${this.#handle(zone.label || 'time zone')}
               <input class="input" aria-label="Label" placeholder=${cityOf(zone.timeZone) || 'Label'} .value=${zone.label}
                      @input=${(e: Event) => this.#edit(() => (zone.label = this.#value(e)))}>
-              <input class="input mono" aria-label="Time zone" list="tz-list" placeholder="America/Chicago" .value=${zone.timeZone}
+              <input class="input mono" aria-label="Time zone" list="tz-list" placeholder=${EXAMPLE_ZONE} .value=${zone.timeZone}
                      data-field="zone:${i}:tz" @input=${(e: Event) => this.#edit(() => (zone.timeZone = this.#value(e).trim()))}>
               ${i === 0 ? html`<span class="zone-main">Main</span>` : html`<span></span>`}
               <button class="icon-btn xs danger" type="button" title="Remove" aria-label="Remove ${zone.label || 'time zone'}"
@@ -1657,6 +1790,7 @@ export class SettingsPanel extends LitElement {
   #dataEditor(w: DataWidget) {
     const tried = this.tries[w.id];
     const sample = tried?.data === undefined ? '' : typeof tried.data === 'string' ? tried.data : JSON.stringify(tried.data, null, 2);
+    const ex = templateExamples(tried?.data);
     const code = (s: string) => html`<code>${s}</code>`;
     return html`
       <label class="field">
@@ -1682,12 +1816,13 @@ export class SettingsPanel extends LitElement {
         </details>` : nothing}
       <details class="css-help">
         <summary>Writing a template</summary>
+        ${tried?.data !== undefined ? html`<p class="field-hint">The examples use names from the data that came back.</p>` : nothing}
         <dl class="css-ref">
-          <dt>A value</dt><dd>${code('{{name}}')}, or one inside another: ${code('{{owner.login}}')}, ${code('{{items.0.title}}')}</dd>
-          <dt>A list</dt><dd>${code('{{#items}}…{{/items}}')} repeats for each item, and inside it ${code('{{name}}')} is the item's.
+          <dt>A value</dt><dd>${code(`{{${ex.value}}}`)}, or one inside another: ${code(`{{${ex.nested}}}`)}${ex.real ? nothing : html`, ${code('{{items.0.title}}')}`}</dd>
+          <dt>A list</dt><dd>${code(`{{#${ex.list}}}…{{/${ex.list}}}`)} repeats for each item, and inside it ${code(`{{${ex.item}}}`)} is the item's.
             ${code('{{.}}')} is the item itself, and ${code('{{#.}}…{{/.}}')} goes through data that's a list to begin with.</dd>
-          <dt>If not</dt><dd>${code('{{^items}}Nothing yet{{/items}}')} shows when the list is empty, or a value is missing or false</dd>
-          <dt>Formats</dt><dd>${code('{{when | ago}}')} — also ${code('date')}, ${code('time')}, ${code('number')}, ${code('upper')}, ${code('lower')}</dd>
+          <dt>If not</dt><dd>${code(`{{^${ex.list}}}Nothing yet{{/${ex.list}}}`)} shows when the list is empty, or a value is missing or false</dd>
+          <dt>Formats</dt><dd>${code(`{{${ex.when} | ago}}`)} — also ${code('date')}, ${code('time')}, ${code('number')}, ${code('upper')}, ${code('lower')}</dd>
           <dt>Markup</dt><dd>Simple tags — ${code('b')}, ${code('i')}, ${code('a')}, ${code('ul')}/${code('li')}, ${code('p')}, ${code('span')},
             ${code('small')}, ${code('code')}, ${code('img')}, ${code('table')} — and class names, to style in custom CSS. Anything else is left out.</dd>
         </dl>
@@ -1771,13 +1906,19 @@ export class SettingsPanel extends LitElement {
           stops the prompt. A single card or tile can be left out under Cards.</p>
       </section>
 
-      <section class="settings-card">
+      <section class="settings-card look-card">
         <header class="settings-card-head">
           <h3>Look</h3>
           <button class="btn btn-ghost btn-sm" type="button" @click=${() => (this.mode = 'view')}>${icon(PaletteIcon)} Choose in My view</button>
         </header>
         <p class="field-hint"><strong>${this.#lookSummary(this.draft.look)}</strong>. Everyone sees this unless they pick
           their own. To change it, pick a look in My view, then choose <strong>Make it everyone's</strong>.</p>
+        ${this.#lookChanged() ? html`
+          <div class="look-note" role="note">
+            ${icon(Users)}
+            <span>Changed, but not saved yet. <strong>Save to file</strong> puts it in launchpad.config.js, for everyone
+              who opens the page. <strong>Save</strong> keeps it in this browser only.</span>
+          </div>` : nothing}
       </section>
 
       ${this.#customCss()}
@@ -1789,15 +1930,17 @@ export class SettingsPanel extends LitElement {
 
   #viewMode() {
     return html`
-      <p class="settings-hint">Kept in this browser, and never changes the page for anyone else.</p>
+      <p class="settings-hint"><strong>Just for you.</strong> Kept in this browser only: none of it goes into
+        launchpad.config.js, so nobody else sees it.</p>
 
       ${look.customized ? html`
         <div class="look-note" role="note">
           ${icon(PaletteIcon)}
-          <span>This is your own look. The page's is ${this.#lookSummary()}.</span>
+          <span>This look is yours, in this browser. Everyone else sees the page's: ${this.#lookSummary()}.</span>
           <span class="look-note-actions">
             <button class="link-btn" type="button" @click=${() => look.reset()}>${icon(RotateCcw)} Use the page's</button>
-            <button class="link-btn" type="button" title="Copy your look into the page's settings, to save for everyone"
+            <button class="link-btn" type="button"
+                    title="Copies your look into the page's settings. Save to file then puts it in launchpad.config.js, for everyone."
                     @click=${this.#makeLookEveryones}>${icon(Users)} Make it everyone's</button>
           </span>
         </div>` : nothing}
@@ -1817,6 +1960,8 @@ export class SettingsPanel extends LitElement {
           ${this.#choice('background', 'Background', this.#backgrounds(), look.background, id => look.set('background', id))}
         </section>
       </div>
+
+      ${this.#colors()}
 
       <div class="look-grid">
       <section class="settings-group">

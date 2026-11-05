@@ -146,10 +146,25 @@ export type Background = (typeof BACKGROUNDS)[number] | (string & {});
 export const THEME_MODES = ['system', 'light', 'dark'] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
 /**
- * How the page looks for everyone. Anyone can pick their own theme, style and background in Settings → My view
- * (see lib/look.ts). `css` is the page's custom CSS (lib/custom-css.ts): in the file, a list of lines.
+ * How the page looks for everyone. Anyone can pick their own theme, style, background and colours in Settings →
+ * My view (see lib/look.ts). `css` is the page's custom CSS (lib/custom-css.ts): in the file, a list of lines.
+ * `colors` are the page's own colours for any style (lib/colors.ts).
  */
-export type Look = { theme: ThemeMode; style: Style; background: Background; css: string };
+export type Look = { theme: ThemeMode; style: Style; background: Background; css: string; colors?: StyleColors };
+
+/** The six colours each style is built from (styles/tokens.css). Its other colours follow from these. */
+export const COLOR_SLOTS = ['bg', 'panel', 'ink', 'accent', 'accent-2', 'accent-3'] as const;
+export type ColorSlot = (typeof COLOR_SLOTS)[number];
+/** Some of a style's colours, each as #rrggbb. */
+export type Colors = Partial<Record<ColorSlot, string>>;
+/**
+ * A style's colours: `hues` for its accent, second accent and highlight (a colour combo, lib/combos.ts),
+ * then any single colours on top, with light and dark kept apart.
+ */
+export type OwnColors = { hues?: [number, number, number]; light?: Colors; dark?: Colors };
+/** Colours for any of the styles. */
+export type StyleColors = Partial<Record<Style, OwnColors>>;
+export const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
 
 /** Greeting beside the clock and weather; pinned beside recent; then the cards. */
 const DEFAULT_SECTIONS: SectionConfig[] = [
@@ -213,6 +228,8 @@ export const validTimeZone = (tz: string) => {
 };
 
 export const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+/** A time zone to show as an example: this device's own, when it has a name like America/Chicago. */
+export const EXAMPLE_ZONE = LOCAL_TIME_ZONE?.includes('/') ? LOCAL_TIME_ZONE : 'America/Chicago';
 
 /** "America/New_York" → "New York" */
 export const cityOf = (timeZone: string) => (timeZone.split('/').pop() ?? timeZone).replace(/_/g, ' ');
@@ -389,10 +406,31 @@ export const MAX_CSS = 50_000;
 function normalizeLook(o: Obj): Look {
   const l = obj(o.look);
   const css = lines(l.css);
+  const colors = normalizeColors(l.colors);
   return {
     theme: oneOf(l.theme, THEME_MODES), style: oneOf(l.style, STYLES), background: isName(l.background) ? l.background : 'particles',
     css: css.trim() ? css.slice(0, MAX_CSS) : '',
+    ...(Object.keys(colors).length ? { colors } : {}),
   };
+}
+
+/** Just the valid colours (hues 0–360, colours lowercased), without empty styles or themes. */
+export function normalizeColors(v: unknown): StyleColors {
+  const all: StyleColors = {};
+  for (const style of STYLES) {
+    const given = obj(obj(v)[style]);
+    const hues = Array.isArray(given.hues) ? given.hues : [];
+    if (hues.length === 3 && hues.every(h => typeof h === 'number' && Number.isFinite(h))) {
+      (all[style] ??= {}).hues = hues.map(h => Math.round((((h % 360) + 360) % 360) * 100) / 100) as [number, number, number];
+    }
+    for (const theme of ['light', 'dark'] as const) {
+      const set = obj(given[theme]);
+      const colors: Colors = {};
+      for (const slot of COLOR_SLOTS) if (isHex(set[slot])) colors[slot] = set[slot].toLowerCase();
+      if (Object.keys(colors).length) (all[style] ??= {})[theme] = colors;
+    }
+  }
+  return all;
 }
 
 function normalizeLink(l: Obj): LinkItem {

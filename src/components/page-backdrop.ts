@@ -7,6 +7,7 @@
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import '../backgrounds/particles.js';
+import { cssColor } from '../lib/colors.js';
 import { registry, type BackgroundType, type Colors } from '../lib/extensions.js';
 import { look } from '../lib/look.js';
 
@@ -66,7 +67,7 @@ export class PageBackdrop extends LitElement {
   #onLook = () => {
     if (!this.#canvas) return;
     const bg = this.#chosen();
-    const shown = [look.theme, look.style, look.reducedMotion, bg?.name].join();
+    const shown = [look.theme, look.style, look.reducedMotion, bg?.name, JSON.stringify(look.colors)].join();
     if (shown === this.#shown && bg === this.#bg) return;
     this.#shown = shown;
     if (bg !== this.#bg) {
@@ -74,12 +75,11 @@ export class PageBackdrop extends LitElement {
       this.#start = performance.now();
       this.#safely(() => bg?.setup?.({ width: this.#w, height: this.#h }));
     }
-    // the canvas' CSS `color` is var(--particle); the rest are read off it as they stand in this style and theme
-    const cs = getComputedStyle(this.#canvas);
-    const v = (name: string) => cs.getPropertyValue(name).trim();
+    // the canvas' CSS `color` is var(--particle); the rest are worked out as they stand in this style and theme
+    // (some are mixed from others, which a canvas can't do itself)
     this.#colors = {
-      particle: cs.color, accent: v('--accent'), accent2: v('--accent-2'), accent3: v('--accent-3'),
-      ink: v('--ink'), muted: v('--muted'), bg: v('--bg'),
+      particle: getComputedStyle(this.#canvas).color, accent: cssColor('--accent'), accent2: cssColor('--accent-2'),
+      accent3: cssColor('--accent-3'), ink: cssColor('--ink'), muted: cssColor('--muted'), bg: cssColor('--bg'),
     };
     this.#restart();
   };

@@ -5,7 +5,7 @@
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import {
-  COLUMN_PRESETS, LOCAL_TIME_ZONE, STARTER, cardColor, cityOf, config, isHttpUrl, normalize, slug, validTimeZone,
+  COLUMN_PRESETS, EXAMPLE_ZONE, LOCAL_TIME_ZONE, STARTER, cardColor, cityOf, config, isHttpUrl, normalize, slug, validTimeZone,
   type CardConfig, type LaunchpadConfig,
 } from '../config.js';
 import { canWriteDirectly, writeConfigFile } from '../lib/config-file.js';
@@ -121,7 +121,7 @@ export class SetupGuide extends LitElement {
   #stepIsValid() {
     if (this.step === 0) {
       if (!this.pageTitle.trim()) return this.#complain('setup:title', 'Give your page a name.');
-      if (!validTimeZone(this.timeZone)) return this.#complain('setup:tz', 'Pick a time zone from the list, e.g. America/Chicago.');
+      if (!validTimeZone(this.timeZone)) return this.#complain('setup:tz', `Pick a time zone from the list, e.g. ${EXAMPLE_ZONE}.`);
     }
     if (this.step === 2 && !this.pasting) {
       for (const [i, row] of this.rows.entries()) {
