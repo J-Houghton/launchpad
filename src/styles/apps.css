@@ -19,9 +19,8 @@ APPS — section head, app rows, env tiles
         display: flex;
         align-items: center;
         gap: 0.6rem;
-        font-size: 1.25rem;
-        font-weight: 650;
-        letter-spacing: -0.015em;
+        font: var(--heading-weight) var(--section-size)/1.15 var(--font-heading);
+        letter-spacing: var(--heading-tracking);
     }
 
     .count {
@@ -99,6 +98,7 @@ APPS — section head, app rows, env tiles
         gap: 0.55rem;
         padding: 0.2rem 0.25rem;
         border-radius: var(--radius-sm);
+        font-family: var(--font-label);
         font-size: var(--fs-sm);
         font-weight: 650;
         letter-spacing: 0.04em;
@@ -149,6 +149,8 @@ APPS — section head, app rows, env tiles
     .app-card {
         --mx: -100vmax;
         --my: -100vmax;
+        /* its colour, for its badge and the tiles that follow it (lib/config.ts cardHue) */
+        --hue: calc(var(--card-hue) + var(--card-index, 0) * 35);
         position: relative;
         isolation: isolate;
         container: card / inline-size;
@@ -210,13 +212,13 @@ APPS — section head, app rows, env tiles
         place-items: center;
         width: 3rem;
         aspect-ratio: 1;
-        border-radius: 0.95rem;
+        border-radius: var(--mark-radius);
         font-size: 0.75rem;
         font-weight: 750;
         letter-spacing: 0.02em;
         color: white;
-        background: linear-gradient(135deg, oklch(0.64 0.2 var(--hue)), oklch(0.47 0.2 calc(var(--hue) + 40)));
-        box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.35), 0 8px 18px -8px oklch(0.5 0.2 var(--hue) / 0.8);
+        background: linear-gradient(135deg, oklch(0.64 calc(var(--card-chroma) + 0.03) var(--hue)), oklch(0.47 calc(var(--card-chroma) + 0.03) calc(var(--hue) + 40)));
+        box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.35), 0 8px 18px -8px oklch(0.5 calc(var(--card-chroma) + 0.03) var(--hue) / 0.8);
         transition: scale var(--dur-med) var(--ease-spring), rotate var(--dur-med) var(--ease-spring);
     }
 
@@ -229,9 +231,8 @@ APPS — section head, app rows, env tiles
     }
 
     .app-title {
-        font-size: 1.125rem;
-        font-weight: 650;
-        letter-spacing: -0.015em;
+        font: var(--heading-weight) var(--title-size)/1.15 var(--font-heading);
+        letter-spacing: var(--heading-tracking);
     }
 
     .app-strap {
@@ -294,7 +295,21 @@ APPS — section head, app rows, env tiles
         opacity: 1;
     }
 
-    /* ---- env tiles: one column per environment, in the configured order, so they line up across apps ---- */
+    /* ---- tiles: environment tiles in fixed columns, then free tiles flowing in a grid ---- */
+    .card-tiles {
+        container: tiles / inline-size;
+        display: grid;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+
+    .tile-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5rem), 1fr));
+        gap: 0.75rem;
+    }
+
+    /* environment tiles: one column per environment, in the configured order, so they line up across cards */
     .env-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -310,11 +325,13 @@ APPS — section head, app rows, env tiles
     }
 
     .env-tile {
+        /* its own colour or its column's, else its card's */
+        --env: var(--tile-color, oklch(0.6 var(--card-chroma) var(--hue)));
         position: relative;
         min-height: 5.75rem;
         border-radius: var(--radius);
-        border: 1px solid color-mix(in oklch, var(--env) 28%, var(--hairline));
-        background-color: color-mix(in oklch, var(--env) 6%, var(--tile));
+        border: var(--border-w) solid color-mix(in oklab, var(--env) 28%, var(--hairline));
+        background-color: color-mix(in oklab, var(--env) 6%, var(--tile));
         transition:
             background-color var(--dur-fast) ease,
             border-color var(--dur-fast) ease,
@@ -338,14 +355,14 @@ APPS — section head, app rows, env tiles
 
     /* "handle with care" environments (e.g. production) get a faint hatch */
     .env-tile[data-caution] {
-        background-image: repeating-linear-gradient(135deg, color-mix(in oklch, var(--env) 8%, transparent) 0 6px, transparent 6px 12px);
+        background-image: repeating-linear-gradient(135deg, color-mix(in oklab, var(--env) 8%, transparent) 0 6px, transparent 6px 12px);
     }
 
     .env-tile:hover,
     .env-tile:has(:focus-visible) {
-        background-color: color-mix(in oklch, var(--env) 14%, var(--tile-hover));
-        border-color: color-mix(in oklch, var(--env) 60%, transparent);
-        box-shadow: 0 12px 26px -14px color-mix(in oklch, var(--env) 80%, transparent);
+        background-color: color-mix(in oklab, var(--env) 14%, var(--tile-hover));
+        border-color: color-mix(in oklab, var(--env) 60%, transparent);
+        box-shadow: 0 12px 26px -14px color-mix(in oklab, var(--env) 80%, transparent);
         translate: 0 -2px;
     }
 
@@ -386,6 +403,7 @@ APPS — section head, app rows, env tiles
     }
 
     .env-tag {
+        font-family: var(--font-label);
         font-size: 0.6875rem;
         font-weight: 750;
         letter-spacing: 0.08em;
@@ -438,7 +456,7 @@ APPS — section head, app rows, env tiles
 
     .env-more:hover {
         color: var(--ink);
-        background: color-mix(in oklch, var(--env) 22%, transparent);
+        background: color-mix(in oklab, var(--env) 22%, transparent);
     }
 
     @media (hover: none) {
@@ -458,4 +476,89 @@ APPS — section head, app rows, env tiles
         color: var(--subtle);
         opacity: 0.7;
     }
+
+    /* ---- more than four tiles: one row that scrolls sideways (components/tile-gallery.ts) ---- */
+    tile-gallery {
+        /* as many tiles in view as the plain grid fits (12.5rem each), so they match the cards around them */
+        --per-view: 1.15;
+        --gap: 0.75rem;
+        position: relative;
+        display: block;
+        min-width: 0;
+    }
+
+    @container tiles (width >= 25.75rem) { tile-gallery { --per-view: 2; } }
+    @container tiles (width >= 39rem) { tile-gallery { --per-view: 3; } }
+    @container tiles (width >= 52.25rem) { tile-gallery { --per-view: 4; } }
+
+    :is(.tile-grid, .env-grid).gallery-track {
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: calc((100% - (var(--per-view) - 1) * var(--gap)) / var(--per-view));
+        gap: var(--gap);
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x mandatory;
+        scroll-behavior: smooth;
+        scrollbar-width: none;
+        /* room for the hover lift, glow and focus ring, which the scroll box would otherwise clip */
+        padding: 0.5rem 0.25rem 1rem;
+        margin: -0.5rem -0.25rem -1rem;
+        scroll-padding-inline: 0.25rem;
+        mask-image: linear-gradient(to right,
+            transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
+        transition: --fade-start var(--dur-med) ease, --fade-end var(--dur-med) ease;
+    }
+
+    .gallery-track::-webkit-scrollbar { display: none; }
+    .gallery-track > * { scroll-snap-align: start; }
+
+    tile-gallery[data-more-start] > .gallery-track { --fade-start: 3rem; }
+    tile-gallery[data-more-end] > .gallery-track { --fade-end: 3rem; }
+
+    .gallery-btn {
+        position: absolute;
+        z-index: 2;
+        top: 50%;
+        display: grid;
+        place-items: center;
+        width: 2.25rem;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        border: 1px solid var(--glass-border);
+        background: var(--glass-strong);
+        backdrop-filter: var(--glass-blur);
+        color: var(--ink);
+        box-shadow: 0 8px 20px -10px hsl(0 0% 0% / 0.5);
+        opacity: 0;
+        scale: 0.8;
+        translate: 0 -50%;
+        pointer-events: none;
+        transition:
+            opacity var(--dur-fast) ease,
+            scale var(--dur-med) var(--ease-spring),
+            background-color var(--dur-fast) ease,
+            border-color var(--dur-fast) ease;
+    }
+
+    .gallery-btn .icon { width: 1.1rem; height: 1.1rem; }
+    .gallery-btn.prev { left: -1.1rem; }
+    .gallery-btn.next { right: -1.1rem; }
+
+    tile-gallery[data-more-start] > .gallery-btn.prev,
+    tile-gallery[data-more-end] > .gallery-btn.next {
+        opacity: 1;
+        scale: 1;
+        pointer-events: auto;
+    }
+
+    .gallery-btn:hover {
+        border-color: var(--glass-border-hover);
+        color: var(--accent-fg);
+        background: var(--accent);
+    }
+
+    .gallery-btn:active { scale: 0.92; }
+
+    [data-motion="reduced"] :is(.tile-grid, .env-grid).gallery-track { scroll-behavior: auto; }
 }

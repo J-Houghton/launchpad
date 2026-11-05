@@ -1,0 +1,361 @@
+/* ===============================
+LAYOUT — the 12-column grid sections and cards sit on (lib/layout.ts), Arrange mode, density
+================================*/
+@layer components {
+    /* each item carries its span at three sizes: --span-sm (narrow), --span-md (medium), --span (wide) */
+    .layout-grid {
+        container: layout / inline-size;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    /* the page's sections get more air between rows than cards do */
+    .page.layout-grid { row-gap: clamp(1.5rem, 3vw, 2.25rem); }
+
+    .layout-item {
+        min-width: 0;
+        grid-column: span var(--span-sm, 12);
+    }
+
+    .layout-item[data-row-start] { grid-column: 1 / span var(--span-sm, 12); }
+
+    @container layout (width >= 40rem) {
+        .layout-item { grid-column: span var(--span-md, 12); }
+        .layout-item[data-row-start] { grid-column: 1 / span var(--span-md, 12); }
+    }
+
+    @container layout (width >= 60rem) {
+        .layout-item { grid-column: span var(--span, 12); }
+        .layout-item[data-row-start] { grid-column: 1 / span var(--span, 12); }
+    }
+
+    /* a section's content fills its cell, so neighbours in a row are the same height */
+    .layout-item[data-section] {
+        position: relative;
+        display: grid;
+    }
+
+    .layout-body { display: contents; }
+
+    /* …except the greeting, which sits at the foot of its row, level with the widgets beside it */
+    .section-greeting hero-section { align-self: end; }
+
+    /* ---- Arrange mode (lib/arrange.ts, components/arrange-ui.ts) ---- */
+    .is-arranging .enter { animation: none; }
+
+    .is-arranging .layout-item {
+        outline: 1.5px dashed color-mix(in oklch, var(--accent) 55%, transparent);
+        outline-offset: 4px;
+        border-radius: var(--radius-lg);
+    }
+
+    /* a frame with its toolbar across the top; the cards inside the cards section have their own */
+    .is-arranging .layout-item[data-section] { padding-top: 2.6rem; }
+    .is-arranging .section-cards { outline-color: color-mix(in oklch, var(--accent) 28%, transparent); }
+
+    .arrange-tools {
+        position: absolute;
+        z-index: 6;
+        top: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.15rem;
+        max-width: 100%;
+        padding: 0.2rem 0.25rem;
+        border: 1px solid var(--glass-border);
+        border-radius: 0.75rem;
+        background: var(--glass-strong);
+        -webkit-backdrop-filter: var(--glass-blur);
+        backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-sm);
+        font-size: var(--fs-xs);
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    /* on a card, the toolbar sits across its top edge, in the card's padding */
+    .app-card > .arrange-tools {
+        top: 0;
+        left: 1rem;
+        translate: 0 -55%;
+    }
+
+    .arrange-tools .drag-handle { width: 1.75rem; height: 1.75rem; }
+    .arrange-tools > * { flex: none; }
+
+    /* on a narrow item, the name gives way to the controls */
+    .arrange-tools > .arrange-name {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 11rem;
+        padding-inline: 0.2rem 0.4rem;
+        font-weight: 650;
+        color: var(--ink);
+    }
+
+    /* width: a ↔ and a number (Auto, 1–12) */
+    .arrange-width {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.15rem;
+        height: 1.75rem;
+        padding-left: 0.4rem;
+        border: 1px solid var(--hairline);
+        border-radius: 0.5rem;
+        background: var(--tile);
+        color: var(--muted);
+    }
+
+    .arrange-width .icon { width: 0.85rem; height: 0.85rem; }
+
+    .arrange-width select {
+        height: 100%;
+        padding: 0 0.3rem;
+        border: 0;
+        background: none;
+        color: var(--ink);
+        font: inherit;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        cursor: pointer;
+    }
+
+    .arrange-width:has(select:focus-visible) { outline: 2px solid var(--ring); outline-offset: 1px; }
+    .arrange-width select:focus-visible { outline: none; }
+
+    /* ---- the 12 columns, drawn faintly behind everything while arranging; they rise in one after another ---- */
+    .is-arranging .page.layout-grid { position: relative; }
+
+    .grid-guides {
+        position: absolute;
+        z-index: 0;
+        grid-column: 1 / -1; /* the grid's own columns, padding aside */
+        inset: 0;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        column-gap: inherit;
+        pointer-events: none;
+    }
+
+    .grid-guides > span {
+        border-inline: 1px dashed color-mix(in oklch, var(--accent) 30%, transparent);
+        border-radius: 6px;
+        background: linear-gradient(to bottom, color-mix(in oklch, var(--accent) 7%, transparent), transparent 85%);
+        transform-origin: top;
+        animation: guide-in 0.7s var(--ease-out) backwards;
+        animation-delay: calc(var(--n) * 40ms);
+    }
+
+    @keyframes guide-in {
+        from { scale: 1 0; opacity: 0; }
+    }
+
+    /* while an edge is dragged, the guides firm up so the columns are easy to count */
+    .page.layout-grid:has([data-resizing]) .grid-guides > span {
+        border-color: color-mix(in oklch, var(--accent) 55%, transparent);
+        background: color-mix(in oklch, var(--accent) 10%, transparent);
+        transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+    }
+
+    /* ---- the handle on an item's right edge: drag it to set the width ---- */
+    .resize-handle {
+        position: absolute;
+        z-index: 6;
+        top: 50%;
+        right: -0.55rem;
+        display: grid;
+        place-items: center;
+        width: 0.6rem;
+        height: 2.75rem;
+        translate: 0 -50%;
+        border-radius: var(--radius-full);
+        background: var(--glass-strong);
+        box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--accent) 60%, transparent), var(--shadow-sm);
+        cursor: ew-resize;
+        touch-action: none;
+        transition: background-color var(--dur-fast) ease, scale var(--dur-med) var(--ease-spring);
+    }
+
+    .resize-handle::before {
+        content: "";
+        width: 2px;
+        height: 1.1rem;
+        border-radius: 2px;
+        background: var(--accent);
+    }
+
+    .resize-handle:hover,
+    [data-resizing] > .resize-handle { scale: 1.15 1.08; background: color-mix(in oklch, var(--accent) 18%, var(--glass-strong)); }
+    .resize-handle:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+    /* the cards section is tall: its handle sits up by its toolbar, clear of the cards' own */
+    .section-cards > .resize-handle { top: 1.3rem; }
+
+    /* "6/12", shown while dragging (or focused) */
+    .resize-badge {
+        position: absolute;
+        bottom: calc(100% + 0.35rem);
+        left: 50%;
+        translate: -50% 0;
+        padding: 0.15rem 0.45rem;
+        border-radius: var(--radius-full);
+        background: var(--accent);
+        color: var(--accent-fg);
+        font-size: var(--fs-xs);
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--dur-fast) ease;
+    }
+
+    .resize-badge small { font-size: 0.85em; font-weight: 600; opacity: 0.75; }
+    [data-resizing] > .resize-handle .resize-badge,
+    .resize-handle:focus-visible .resize-badge,
+    .resize-handle:hover .resize-badge { opacity: 1; }
+
+    /* widths only apply as set on wide screens; narrower ones stack, so there's nothing to drag */
+    @container layout (width < 60rem) {
+        .resize-handle { display: none; }
+    }
+
+    .arrange-btn {
+        display: grid;
+        place-items: center;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 0.5rem;
+        color: var(--muted);
+        transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+    }
+
+    .arrange-btn .icon { width: 0.95rem; height: 0.95rem; }
+    .arrange-btn:hover { color: var(--ink); background: var(--tile-hover); }
+    .arrange-btn[aria-pressed="true"] { color: var(--accent); background: color-mix(in oklch, var(--accent) 14%, transparent); }
+    .arrange-btn:disabled { opacity: 0.35; pointer-events: none; }
+
+    /* where a dragged item will land: a bar beside the item it'll go before or after */
+    [data-sort-axis="grid"] > .drop-before::before,
+    [data-sort-axis="grid"] > .drop-after::after {
+        content: "";
+        position: absolute;
+        z-index: 7;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        height: auto;
+        padding: 0;
+        border-radius: 4px;
+        background: var(--accent);
+        box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 25%, transparent);
+        mask: none;
+        opacity: 1;
+        pointer-events: none;
+    }
+
+    [data-sort-axis="grid"] > .drop-before::before { left: -0.6rem; right: auto; }
+    [data-sort-axis="grid"] > .drop-after::after { right: -0.6rem; left: auto; }
+
+    /* centred by its margins, so it can use the full width before anything wraps */
+    .arrange-bar {
+        position: fixed;
+        z-index: 50;
+        inset: auto 1rem max(1rem, env(safe-area-inset-bottom));
+        display: flex;
+        align-items: center;
+        gap: 0.6rem 1rem;
+        width: fit-content;
+        max-width: calc(100% - 2rem);
+        margin-inline: auto;
+        padding: 0.55rem 0.6rem 0.55rem 1rem;
+        border-radius: 1.25rem;
+        box-shadow: var(--shadow-lg);
+        animation: arrange-in var(--dur-med) var(--ease-spring);
+    }
+
+    .arrange-bar > * { flex: none; }
+
+    @keyframes arrange-in {
+        from { translate: 0 120%; opacity: 0; }
+    }
+
+    /* toasts rise above the bar while it's there */
+    .is-arranging .toast { bottom: 6.5rem; }
+
+    .arrange-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 700;
+    }
+
+    .arrange-title .icon { color: var(--accent); }
+
+    /* the hint gives way first when space is short */
+    .arrange-bar > .arrange-hint {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: var(--fs-xs);
+        color: var(--muted);
+    }
+
+    .arrange-hint .icon { display: inline-block; width: 0.85rem; height: 0.85rem; vertical-align: -0.15em; }
+
+    .segmented.sm label { padding: 0.3rem 0.7rem; font-size: var(--fs-xs); }
+
+    .arrange-hidden {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: var(--fs-xs);
+        color: var(--muted);
+    }
+
+    .arrange-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.6rem;
+        border: 1px dashed color-mix(in oklch, var(--accent) 55%, transparent);
+        border-radius: var(--radius-full);
+        font-size: var(--fs-xs);
+        font-weight: 600;
+        color: var(--ink);
+    }
+
+    .arrange-chip .icon { width: 0.85rem; height: 0.85rem; }
+    .arrange-chip:hover { border-style: solid; background: var(--tile-hover); }
+
+    .arrange-actions { display: flex; gap: 0.4rem; }
+
+    /* room under the last row, so the bar doesn't cover it */
+    .is-arranging .page { padding-bottom: 8rem; }
+
+    @media (width < 56rem) {
+        .arrange-bar { flex-wrap: wrap; justify-content: center; }
+        .arrange-bar > .arrange-hint { display: none; }
+        .is-arranging .toast { bottom: 10rem; }
+    }
+
+    /* ---- density: compact trades a little air for more on screen ---- */
+    :root[data-density="compact"] .layout-grid { gap: 0.75rem; }
+    :root[data-density="compact"] .page.layout-grid { row-gap: clamp(1rem, 2vw, 1.5rem); }
+    :root[data-density="compact"] .app-card { padding: 0.8rem 1rem; }
+    :root[data-density="compact"] .app-layout { gap: 0.9rem; }
+    :root[data-density="compact"] .app-mark { width: 2.5rem; }
+    :root[data-density="compact"] :is(.env-tile, .env-empty) { min-height: 4.25rem; }
+    :root[data-density="compact"] .env-link { gap: 0.1rem; padding: 0.6rem 0.85rem 0.65rem 1rem; }
+    /* a tile with a name drops the address line (it's in the tile's menu) */
+    :root[data-density="compact"] .env-name ~ .env-host { display: none; }
+    :root[data-density="compact"] .panel { gap: 0.55rem; padding: 0.7rem 0.9rem 0.8rem; }
+    :root[data-density="compact"] .widget { padding: 0.8rem 1rem 0.85rem; }
+}

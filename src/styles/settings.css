@@ -407,7 +407,7 @@ SETTINGS — modal dialog, form controls
         font-size: 0.625rem;
         font-weight: 750;
         color: white;
-        background: linear-gradient(135deg, oklch(0.64 0.2 var(--hue)), oklch(0.47 0.2 calc(var(--hue) + 40)));
+        background: linear-gradient(135deg, oklch(0.64 calc(var(--card-chroma) + 0.03) var(--hue)), oklch(0.47 calc(var(--card-chroma) + 0.03) calc(var(--hue) + 40)));
     }
 
     .app-editor-title {
@@ -456,6 +456,7 @@ SETTINGS — modal dialog, form controls
 
     .app-env-row,
     .app-link-row,
+    .free-tile-row,
     .link-edit-row,
     .env-def-row,
     .zone-row {
@@ -469,6 +470,10 @@ SETTINGS — modal dialog, form controls
     /* one row per environment, in column order: [DEV] name  https://…  ☑ status */
     .app-env-row { grid-template-columns: 5.5rem minmax(7rem, 1fr) minmax(12rem, 1.8fr) auto; }
     .app-link-row { grid-template-columns: auto 8.5rem minmax(7rem, 1fr) minmax(12rem, 1.8fr) auto; }
+    /* a free tile: ⋮⋮ colour  TAG  name  https://…  ☑ status  🗑 */
+    .free-tile-row { grid-template-columns: auto auto 5.5rem minmax(7rem, 1fr) minmax(12rem, 1.6fr) auto auto; }
+    /* a column's tile, listed while columns are off: its column stands in for the colour and tag */
+    .tile-column-pill { grid-column: span 2; }
     .link-edit-row { grid-template-columns: auto minmax(8rem, 1fr) minmax(12rem, 2fr) auto; }
     .env-def-row { grid-template-columns: auto auto minmax(7rem, 12rem) auto 1fr auto; }
     .zone-row { grid-template-columns: auto minmax(7rem, 1fr) minmax(12rem, 1.6fr) 3rem auto; }
@@ -478,9 +483,9 @@ SETTINGS — modal dialog, form controls
         place-items: center;
         height: 2.375rem;
         border-radius: 0.625rem;
-        border: 1px solid color-mix(in oklch, var(--env) 40%, transparent);
+        border: 1px solid color-mix(in oklab, var(--env) 40%, transparent);
         border-left: 3px solid var(--env);
-        background: color-mix(in oklch, var(--env) 10%, var(--tile));
+        background: color-mix(in oklab, var(--env) 10%, var(--tile));
         color: var(--env-ink);
         font-size: 0.6875rem;
         font-weight: 750;
@@ -550,6 +555,9 @@ SETTINGS — modal dialog, form controls
         .app-env-row { grid-template-columns: 5.5rem 1fr auto; }
         .app-env-row .mono { grid-column: 1 / -1; order: 1; }
         .app-link-row { grid-template-columns: auto 1fr 1fr auto; }
+        .free-tile-row { grid-template-columns: auto auto 4.5rem minmax(0, 1fr) auto; }
+        .free-tile-row .mono { grid-column: 2 / 5; order: 1; }
+        .free-tile-row .check { order: 1; }
         .link-edit-row { grid-template-columns: auto 1fr auto; }
         .zone-row { grid-template-columns: auto 1fr auto auto; }
         :is(.app-link-row, .link-edit-row, .zone-row) .mono { grid-column: 2 / -1; order: 1; }
@@ -791,18 +799,18 @@ SETTINGS — modal dialog, form controls
         margin-left: auto;
     }
 
-    /* ---- appearance ---- */
-    .palette-options {
+    /* ---- My view: styles, a row of small previews ---- */
+    .style-options {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fill, minmax(7.25rem, 1fr));
+        gap: 0.6rem;
     }
 
-    .palette-card {
+    .style-card {
         position: relative;
         display: grid;
-        gap: 0.35rem;
-        padding: 0.75rem 0.75rem 0.9rem;
+        gap: 0.4rem;
+        padding: 0.4rem 0.4rem 0.5rem;
         border: 1px solid var(--hairline);
         border-radius: var(--radius);
         background: var(--tile);
@@ -810,75 +818,175 @@ SETTINGS — modal dialog, form controls
         transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, translate var(--dur-med) var(--ease-spring);
     }
 
-    .palette-card:hover { translate: 0 -2px; }
+    .style-card:hover { translate: 0 -2px; }
 
-    .palette-card:has(input:checked) {
+    .style-card:has(input:checked) {
         border-color: var(--accent);
         box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 20%, transparent);
     }
 
-    .palette-card:has(input:focus-visible) {
+    .style-card:has(input:focus-visible) {
         outline: 2px solid var(--ring);
         outline-offset: 2px;
     }
 
-    .palette-card input,
+    .style-card input,
     .segmented input {
         position: absolute;
         opacity: 0;
         pointer-events: none;
     }
 
-    .palette-preview {
-        display: flex;
-        align-items: flex-end;
-        gap: 0.35rem;
-        height: 5rem;
-        margin-bottom: 0.35rem;
-        padding: 0.6rem;
+    /*
+     * A little card of tiles on the style's backdrop. The preview wears the style (data-style), so every
+     * token here is that style's own, in this theme; styles/looks.css adds each one's finishing touches.
+     */
+    .style-preview {
+        position: relative;
+        display: grid;
+        align-items: center;
+        height: 4.75rem;
+        padding: 0.5rem 0.55rem;
+        overflow: hidden;
         border-radius: 0.65rem;
         box-shadow: inset 0 0 0 1px hsl(0 0% 0% / 0.08);
-    }
-
-    .palette-preview[data-preview="classic"] {
-        background: repeating-linear-gradient(135deg, #fff 0 9.9px, hsl(0 0% 82%) 9.9px 12.73px);
-        border-bottom: 3px solid hsl(41.45 87.36% 65.88%);
-    }
-
-    .palette-preview[data-preview="aurora"] {
+        color: var(--ink);
         background:
-            radial-gradient(circle at 15% 20%, oklch(0.74 0.17 300 / 0.8), transparent 55%),
-            radial-gradient(circle at 85% 10%, oklch(0.8 0.15 345 / 0.7), transparent 55%),
-            radial-gradient(circle at 60% 110%, oklch(0.88 0.12 75 / 0.8), transparent 60%),
-            oklch(0.972 0.014 305);
+            radial-gradient(circle at 12% 15%, var(--blob-1), transparent 60%),
+            radial-gradient(circle at 90% 10%, var(--blob-2), transparent 60%),
+            radial-gradient(circle at 60% 120%, var(--blob-3), transparent 65%),
+            var(--page-bg),
+            var(--backdrop-base);
     }
 
-    .swatch {
-        width: 1.25rem;
-        aspect-ratio: 1;
-        border-radius: 50%;
-        box-shadow: 0 0 0 2px white, 0 2px 6px hsl(0 0% 0% / 0.25);
+    .sp-card {
+        display: grid;
+        gap: 0.3rem;
+        padding: 0.35rem 0.4rem 0.4rem;
+        border: var(--border-w) solid var(--glass-border);
+        border-radius: var(--radius);
+        background: var(--glass);
+        -webkit-backdrop-filter: var(--glass-blur);
+        backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow);
     }
 
-    .palette-name {
+    .sp-head {
         display: flex;
         align-items: center;
-        gap: 0.35rem;
+        gap: 0.4rem;
+    }
+
+    .sp-mark {
+        width: 0.8rem;
+        aspect-ratio: 1;
+        border-radius: var(--mark-radius);
+        background: linear-gradient(135deg, oklch(0.64 calc(var(--card-chroma) + 0.03) var(--card-hue)), oklch(0.47 calc(var(--card-chroma) + 0.03) calc(var(--card-hue) + 40)));
+    }
+
+    .sp-title {
+        font: var(--heading-weight) calc(var(--title-size) * 0.66)/1 var(--font-heading);
+        letter-spacing: var(--heading-tracking);
+    }
+
+    .sp-tiles {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.22rem;
+    }
+
+    .sp-tile {
+        position: relative;
+        display: grid;
+        align-content: start;
+        gap: 0.18rem;
+        height: 1.15rem;
+        padding: 0.25rem 0.25rem 0 0.35rem;
+        border: var(--border-w) solid color-mix(in oklab, var(--env) 28%, var(--hairline));
+        border-radius: var(--radius-sm);
+        background: color-mix(in oklab, var(--env) 6%, var(--tile));
+    }
+
+    .sp-tile::before {
+        content: "";
+        position: absolute;
+        left: calc(var(--border-w) * -1);
+        top: 0.2rem;
+        bottom: 0.2rem;
+        width: 2px;
+        background: var(--env);
+    }
+
+    .sp-tag,
+    .sp-line {
+        height: 3px;
+        border-radius: 2px;
+    }
+
+    .sp-tag { width: 40%; background: var(--env-ink); }
+    .sp-line { width: 75%; background: color-mix(in oklch, var(--ink) 30%, transparent); }
+
+    .style-tag {
+        padding: 0.05rem 0.45rem;
+        border-radius: var(--radius-full);
+        background: var(--tile-hover);
+        box-shadow: inset 0 0 0 1px var(--hairline);
+        font-size: 0.6875rem;
+        font-weight: 600;
+        color: var(--muted);
+    }
+
+    /* the smaller choices sit two or more to a row when there's room */
+    .look-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+        align-items: start;
+        gap: 1rem 1.5rem;
+    }
+
+    .look-note {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 0.75rem;
+        padding: 0.6rem 0.85rem;
+        border: 1px solid color-mix(in oklch, var(--accent) 35%, transparent);
+        border-radius: var(--radius-sm);
+        background: color-mix(in oklch, var(--accent) 9%, transparent);
+        font-size: var(--fs-sm);
+    }
+
+    .settings-stack { display: grid; align-content: start; gap: 1rem; }
+
+    .look-note > .icon { color: var(--accent); }
+    .look-note > span { flex: 1 1 20rem; }
+    .look-note > .look-note-actions { flex: 0 1 auto; display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; }
+
+    .style-name {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.3rem;
+        padding-inline: 0.2rem;
+        font-size: var(--fs-sm);
         font-weight: 650;
     }
 
-    .palette-current .icon {
+    /* the chosen one, ticked in its own accent */
+    .style-current {
+        position: absolute;
+        top: 0.3rem;
+        right: 0.3rem;
+    }
+
+    .style-current .icon {
         width: 1rem;
         height: 1rem;
         padding: 0.15rem;
         border-radius: 50%;
         color: var(--accent-fg);
         background: var(--accent);
-    }
-
-    .palette-desc {
-        font-size: var(--fs-xs);
-        color: var(--muted);
+        box-shadow: 0 0 0 2px var(--glass-strong);
     }
 
     .segmented {
@@ -1094,6 +1202,17 @@ SETTINGS — modal dialog, form controls
 
     .panel-heading .icon { color: var(--accent); }
 
+    .csv-layouts {
+        display: grid;
+        gap: 0.35rem;
+        margin: 0.4rem 0 0;
+        padding-left: 1.1rem;
+        font-size: var(--fs-sm);
+        color: var(--muted);
+    }
+
+    .csv-layouts strong { color: var(--ink); font-weight: 600; }
+
     .csv-input {
         height: auto;
         min-height: 9rem;
@@ -1275,6 +1394,10 @@ SETTINGS — modal dialog, form controls
         gap: 0.45rem;
     }
 
+    /* just links: category · name · address */
+    .setup-table.links { min-width: 30rem; }
+    .setup-table.links .setup-row { grid-template-columns: minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(12rem, 1.6fr) 1.75rem; }
+
     .setup-head .env-pill { justify-self: start; }
 
     .setup-summary {
@@ -1302,4 +1425,297 @@ SETTINGS — modal dialog, form controls
     }
 
     .setup-summary .env-pill { margin-right: 0.25rem; }
+
+    /* ---- Layout tab: a row per section — name, width, new row, shown ---- */
+    .section-row {
+        display: grid;
+        grid-template-columns: auto minmax(5rem, 8rem) minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.5rem 0.75rem;
+        width: 100%;
+        padding: 0.45rem 0.75rem 0.45rem 0.4rem;
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius);
+        background: var(--tile);
+    }
+
+    .section-name { font-weight: 600; }
+    .section-row.is-hidden .section-name { color: var(--subtle); }
+    .section-row .field > .field-label { display: none; }
+
+    .width-field {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 0.9rem;
+    }
+
+    .width-field select { width: auto; min-width: 5.5rem; }
+
+    @container settings (width < 38rem) {
+        .section-row { grid-template-columns: auto 1fr auto; }
+        .section-row .field { grid-column: 2 / -1; order: 1; }
+    }
+
+    /* ---- added widgets, in the Widgets tab ---- */
+    .add-widget {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 0.9rem;
+        border: 1px dashed color-mix(in oklch, var(--accent) 40%, transparent);
+        border-radius: var(--radius);
+    }
+
+    .add-widget > .field-label { margin-right: auto; }
+
+    .settings-card-head h3 .icon { display: inline-block; width: 1rem; height: 1rem; vertical-align: -0.15em; color: var(--accent); }
+
+    .widget-kind {
+        margin-left: 0.35rem;
+        padding: 0.05rem 0.45rem;
+        border-radius: var(--radius-full);
+        background: var(--tile-hover);
+        box-shadow: inset 0 0 0 1px var(--hairline);
+        font-size: 0.6875rem;
+        font-weight: 600;
+        vertical-align: 0.15em;
+        color: var(--muted);
+    }
+
+    .added-widget .settings-card-head .icon-btn { margin-left: 0.25rem; }
+    .template-input { min-height: 7rem; }
+
+    .data-try {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 0.75rem;
+    }
+
+    .data-preview { padding: 0.85rem 1rem; }
+
+    /* ---- extensions, in the Page tab ---- */
+    .extension-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .ext-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        max-width: 18rem;
+        overflow: hidden;
+        font-size: var(--fs-xs);
+        color: var(--subtle);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ext-state .icon { flex: none; width: 0.85rem; height: 0.85rem; }
+    .ext-state.good { color: var(--ok); }
+    .ext-state.bad { color: var(--bad); }
+    .example-card:disabled { opacity: 0.6; cursor: default; translate: none; }
+
+    @container settings (width < 34rem) {
+        .extension-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+        .extension-row .ext-state { grid-column: 2 / -1; order: 1; }
+    }
+
+    /* ---- custom CSS ---- */
+    .css-input {
+        min-height: 12rem;
+        tab-size: 2;
+    }
+
+    .css-help {
+        display: grid;
+        gap: 0.6rem;
+        font-size: var(--fs-sm);
+    }
+
+    .css-help > summary {
+        width: fit-content;
+        font-weight: 600;
+        color: var(--accent);
+        cursor: pointer;
+    }
+
+    .css-ref {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: 0.4rem 1rem;
+        margin: 0;
+    }
+
+    .css-ref dt { font-weight: 600; color: var(--muted); }
+    .css-ref dd { margin: 0; line-height: 1.9; }
+
+    .css-help code {
+        padding: 0.05rem 0.35rem;
+        border-radius: 0.35rem;
+        background: var(--tile-hover);
+        box-shadow: inset 0 0 0 1px var(--hairline);
+        font-size: 0.78rem;
+        white-space: nowrap;
+    }
+
+    .look-note code { font-size: 0.8rem; }
+    .fold-body .field-hint code { white-space: nowrap; }
+
+    .look-note .link-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .look-note .link-btn .icon { width: 0.9rem; height: 0.9rem; }
+
+    /* ---- menus: Spreadsheet (Cards tab) and File (footer). Each button names its menu's anchor inline ---- */
+    .settings-menu {
+        width: 21rem;
+        transform-origin: top left;
+        position-area: bottom span-right;
+        position-try-fallbacks: flip-block, flip-inline;
+        margin-block: 0.375rem;
+    }
+
+    .settings-menu.up {
+        transform-origin: bottom left;
+        position-area: top span-right;
+    }
+
+    /* without anchor positioning, it's centred on the screen */
+    @supports not (anchor-name: --a) {
+        .settings-menu { inset: 0; margin: auto; height: fit-content; }
+    }
+
+    .menu-trigger .icon:last-child { width: 0.85rem; height: 0.85rem; opacity: 0.7; }
+
+    .menu-note {
+        padding: 0.45rem 0.65rem 0.35rem;
+        font-size: var(--fs-xs);
+        line-height: 1.5;
+        color: var(--muted);
+    }
+
+    .menu-note .link-btn { display: inline-flex; align-items: center; gap: 0.2rem; }
+    .menu-note .link-btn .icon { width: 0.8rem; height: 0.8rem; }
+
+    .menu-label {
+        padding: 0.35rem 0.65rem 0.15rem;
+        font-size: 0.6875rem;
+        font-weight: 650;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--subtle);
+    }
+
+    /* ---- examples in the setup guide ---- */
+
+    .menu-item-text {
+        display: grid;
+        gap: 0.1rem;
+    }
+
+    .menu-item-text > span {
+        font-size: var(--fs-xs);
+        color: var(--muted);
+    }
+
+    .settings-menu .menu-item { align-items: flex-start; }
+    .settings-menu .menu-item .icon { margin-top: 0.15rem; }
+
+    /* ---- folding panels: Columns (Cards tab), Custom CSS (Page tab) ---- */
+    .fold {
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius);
+        background: var(--tile);
+    }
+
+    .fold > summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 0.75rem;
+        padding: 0.65rem 0.85rem;
+        list-style: none;
+        cursor: pointer;
+    }
+
+    .fold > summary::-webkit-details-marker { display: none; }
+    .fold > summary:hover .fold-title { color: var(--accent); }
+
+    .fold-chevron .icon {
+        width: 1rem;
+        height: 1rem;
+        color: var(--subtle);
+        rotate: -90deg;
+        transition: rotate var(--dur-med) var(--ease-spring);
+    }
+
+    .fold[open] .fold-chevron .icon { rotate: 0deg; }
+
+    .fold-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 650;
+        transition: color var(--dur-fast) ease;
+    }
+
+    .fold-title .icon { width: 1rem; height: 1rem; color: var(--accent); }
+    .columns-state { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; }
+    .fold-hint { margin-left: auto; font-size: var(--fs-xs); color: var(--subtle); }
+
+    .fold-body {
+        display: grid;
+        gap: 0.75rem;
+        padding: 0.25rem 0.85rem 0.9rem;
+    }
+
+    /* a heading with its hint and action on one line */
+    .sub-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 0.75rem;
+    }
+
+    .sub-head > .btn { margin-left: auto; }
+    .width-of { font-size: var(--fs-xs); color: var(--subtle); }
+
+    .setup-examples {
+        display: grid;
+        gap: 0.6rem;
+        margin-top: 0.5rem;
+        padding-top: 1.1rem;
+        border-top: 1px solid var(--hairline);
+    }
+
+    .example-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+        gap: 0.65rem;
+    }
+
+    .example-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.85rem 1rem;
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius);
+        background: var(--tile);
+        text-align: left;
+        transition: border-color var(--dur-fast) ease, translate var(--dur-med) var(--ease-spring);
+    }
+
+    .example-card:hover { translate: 0 -2px; border-color: var(--glass-border-hover); }
+    .example-card > .icon { flex: none; width: 1.25rem; height: 1.25rem; margin-top: 0.1rem; color: var(--accent); }
+    .example-card > span { display: grid; gap: 0.15rem; }
 }

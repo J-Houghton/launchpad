@@ -9,10 +9,23 @@ TOKENS
     initial-value: 0deg;
 }
 
+/* a tile gallery's faded edges, which ease in and out as you scroll */
+@property --fade-start {
+    syntax: "<length>";
+    inherits: false;
+    initial-value: 0px;
+}
+
+@property --fade-end {
+    syntax: "<length>";
+    inherits: false;
+    initial-value: 0px;
+}
+
 @layer tokens {
     :root {
         --font-sans: "Inter Variable", ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        --font-display: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
+        --font-serif: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
         --font-mono: ui-monospace, "Cascadia Code", "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
 
         /* type */
@@ -20,18 +33,12 @@ TOKENS
         --fs-sm: 0.875rem;
         --fs-md: 1rem;
         --fs-lg: 1.125rem;
-        --fs-display: clamp(3rem, 2rem + 4.5vw, 5.75rem);
-        --fs-display-sub: clamp(1.625rem, 1.2rem + 1.6vw, 2.5rem);
 
-        /* spacing + radius */
+        /* spacing */
         --space-1: 0.5rem;
         --space-2: 1rem;
         --space-3: 1.5rem;
         --space-4: 2.5rem;
-        --radius-sm: 0.625rem;
-        --radius: 1rem;
-        --radius-lg: 1.375rem;
-        --radius-full: 999px;
 
         /* layout */
         --wrap-max: 76rem;
@@ -52,10 +59,44 @@ TOKENS
     }
 
     /* ----------------------------------------------------------------
-       CLASSIC — the original page's colors (also the base the other palette builds on):
-       grey/white diagonal stripes, purple text, gold lines
+       STYLES — each is a whole look, not just colours: Aurora (the default), Classic, Blueprint,
+       Paper, Neon and Bold. Their rules also match [data-style] elements inside the page, so a
+       preview in Settings can wear a style that isn't the page's. styles/looks.css adds what
+       tokens can't (the backdrop's art, and touches on cards, tiles and the greeting).
        ---------------------------------------------------------------- */
-    :root {
+
+    /* shapes and type: these are Aurora's and Classic's, and the others change them */
+    :root,
+    [data-style] {
+        --radius-sm: 0.625rem;
+        --radius: 1rem;
+        --radius-lg: 1.375rem;
+        --radius-full: 999px;
+        --border-w: 1px;
+        --mark-radius: 32%; /* a card's badge */
+
+        --font-heading: var(--font-sans); /* card names and the section heading */
+        --heading-weight: 650;
+        --heading-tracking: -0.015em;
+        --title-size: 1.125rem;
+        --section-size: 1.25rem;
+        --font-label: var(--font-sans); /* small capitals: tags, panel and widget labels */
+        --font-numeric: var(--font-sans); /* the clock and the temperature */
+        --numeric-weight: 600;
+        --numeric-tracking: -0.045em;
+
+        --font-display: var(--font-serif); /* the greeting */
+        --fs-display: clamp(3rem, 2rem + 4.5vw, 5.75rem);
+        --fs-display-sub: clamp(1.625rem, 1.2rem + 1.6vw, 2.5rem);
+        --display-weight: 400;
+        --display-tracking: -0.02em;
+        --display-sub-style: italic;
+    }
+
+    /* ---- CLASSIC — the original page's colours (and the base the others build on):
+            grey/white diagonal stripes, purple text, gold lines ---- */
+    :root,
+    [data-style="classic"] {
         color-scheme: light;
         --warn: hsl(40 90% 45%);
 
@@ -104,9 +145,14 @@ TOKENS
         --blob-4: hsl(266 55% 65% / 0.12);
         --particle: hsl(266 55% 35% / 0.55);
         --grain-opacity: 0;
+
+        /* where the cards' hues start (each card steps on round the wheel), and how strong they are */
+        --card-hue: 285;
+        --card-chroma: 0.17;
     }
 
-    .theme-dark {
+    .theme-dark,
+    .theme-dark [data-style="classic"] {
         color-scheme: dark;
         --bg: hsl(0 0% 12%);
         --panel: hsl(0 0% 18%);
@@ -137,10 +183,8 @@ TOKENS
         --particle: hsl(266 55% 75% / 0.55);
     }
 
-    /* ----------------------------------------------------------------
-       AURORA (the default) — atmospheric purple/pink glow; switch in Settings → My view
-       ---------------------------------------------------------------- */
-    [data-palette="aurora"] {
+    /* ---- AURORA (the default) — a purple and pink glow over the whole page, frosted glass ---- */
+    [data-style="aurora"] {
         color-scheme: light;
 
         --bg: oklch(0.972 0.014 305);
@@ -176,9 +220,12 @@ TOKENS
         --blob-4: oklch(0.78 0.12 255 / 0.5);
         --particle: oklch(0.42 0.16 300);
         --grain-opacity: 0.05;
+        --card-hue: 285;
+        --card-chroma: 0.17;
     }
 
-    [data-palette="aurora"].theme-dark {
+    .theme-dark[data-style="aurora"],
+    .theme-dark [data-style="aurora"] {
         color-scheme: dark;
         --bg: oklch(0.155 0.03 295);
         --ink: oklch(0.96 0.012 300);
@@ -209,6 +256,362 @@ TOKENS
         --blob-4: oklch(0.42 0.17 265 / 0.45);
         --particle: oklch(0.86 0.07 300);
         --grain-opacity: 0.07;
+    }
+
+    /* ---- BLUEPRINT — grid paper, square corners, monospaced type; navy at night ---- */
+    [data-style="blueprint"] {
+        color-scheme: light;
+        --bg: oklch(0.968 0.016 240);
+        --backdrop-base: var(--bg);
+        --grid-line: oklch(0.55 0.14 245 / 0.17);
+        --grid-fine: oklch(0.55 0.14 245 / 0.07);
+        --page-bg:
+            linear-gradient(var(--grid-line) 1px, transparent 1px) -1px -1px / 120px 120px,
+            linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) -1px -1px / 120px 120px,
+            linear-gradient(var(--grid-fine) 1px, transparent 1px) -1px -1px / 24px 24px,
+            linear-gradient(90deg, var(--grid-fine) 1px, transparent 1px) -1px -1px / 24px 24px;
+        --art-mask: linear-gradient(#000 0 0);
+        --ink: oklch(0.27 0.08 255);
+        --muted: oklch(0.44 0.06 250);
+        --subtle: oklch(0.58 0.05 248);
+        --accent: oklch(0.5 0.17 252);
+        --accent-2: oklch(0.6 0.12 215);
+        --accent-3: oklch(0.72 0.15 65);
+        --accent-fg: oklch(0.99 0 0);
+        --ink-mix: black;
+
+        --glass: oklch(0.99 0.006 240 / 0.88);
+        --glass-strong: oklch(0.99 0.006 240 / 0.97);
+        --glass-border: oklch(0.5 0.13 250 / 0.42);
+        --glass-border-hover: oklch(0.5 0.17 252 / 0.85);
+        --glass-highlight: transparent;
+        --glass-blur: none;
+        --tile: oklch(0.975 0.012 240);
+        --tile-hover: oklch(0.95 0.03 240);
+        --hairline: oklch(0.5 0.12 250 / 0.2);
+        --shadow-sm: 0 0 #0000;
+        --shadow: 0 0 #0000;
+        --shadow-lg: 0 18px 40px -24px oklch(0.3 0.1 255 / 0.45);
+        --ring: oklch(0.55 0.2 252);
+
+        --blob-1: oklch(0.88 0.05 240 / 0.45);
+        --blob-2: transparent;
+        --blob-3: oklch(0.9 0.04 220 / 0.4);
+        --blob-4: transparent;
+        --particle: oklch(0.5 0.15 252);
+        --grain-opacity: 0;
+        --card-hue: 230;
+        --card-chroma: 0.12;
+
+        --radius-sm: 2px;
+        --radius: 3px;
+        --radius-lg: 4px;
+        --radius-full: 3px;
+        --mark-radius: 6%;
+        --font-heading: var(--font-mono);
+        --heading-weight: 600;
+        --heading-tracking: -0.02em;
+        --title-size: 1.05rem;
+        --section-size: 1.1rem;
+        --font-label: var(--font-mono);
+        --font-numeric: var(--font-mono);
+        --numeric-weight: 500;
+        --numeric-tracking: -0.06em;
+        --font-display: var(--font-mono);
+        --fs-display: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+        --fs-display-sub: clamp(1.1rem, 0.95rem + 0.8vw, 1.5rem);
+        --display-weight: 600;
+        --display-tracking: -0.06em;
+        --display-sub-style: normal;
+    }
+
+    .theme-dark[data-style="blueprint"],
+    .theme-dark [data-style="blueprint"] {
+        color-scheme: dark;
+        --bg: oklch(0.25 0.075 257);
+        --grid-line: oklch(0.88 0.07 230 / 0.14);
+        --grid-fine: oklch(0.88 0.07 230 / 0.055);
+        --ink: oklch(0.96 0.015 230);
+        --muted: oklch(0.82 0.04 232);
+        --subtle: oklch(0.68 0.05 235);
+        --accent: oklch(0.83 0.11 222);
+        --accent-2: oklch(0.8 0.1 190);
+        --accent-3: oklch(0.86 0.13 85);
+        --accent-fg: oklch(0.24 0.075 257);
+        --ink-mix: white;
+
+        --glass: oklch(0.28 0.075 257 / 0.85);
+        --glass-strong: oklch(0.26 0.075 257 / 0.97);
+        --glass-border: oklch(0.86 0.08 225 / 0.34);
+        --glass-border-hover: oklch(0.86 0.1 222 / 0.8);
+        --tile: oklch(0.3 0.07 257);
+        --tile-hover: oklch(0.34 0.07 257);
+        --hairline: oklch(0.9 0.05 225 / 0.16);
+        --shadow-lg: 0 18px 40px -20px oklch(0.1 0.05 257 / 0.7);
+        --ring: oklch(0.85 0.12 222);
+
+        --blob-1: oklch(0.4 0.1 250 / 0.45);
+        --blob-3: oklch(0.38 0.08 230 / 0.4);
+        --particle: oklch(0.88 0.08 222);
+    }
+
+    /* ---- PAPER — cream stock, inked outlines, serif headings and a red accent; ink at night ---- */
+    [data-style="paper"] {
+        color-scheme: light;
+        --bg: oklch(0.955 0.02 85);
+        --backdrop-base: var(--bg);
+        --page-bg: none;
+        --art-mask: linear-gradient(#000 0 0);
+        --ink: oklch(0.23 0.015 60);
+        --muted: oklch(0.42 0.02 60);
+        --subtle: oklch(0.56 0.02 65);
+        --accent: oklch(0.55 0.19 30);
+        --accent-2: oklch(0.42 0.13 28);
+        --accent-3: oklch(0.62 0.11 75);
+        --accent-fg: oklch(0.98 0.012 85);
+        --ink-mix: black;
+
+        --glass: oklch(0.985 0.01 88);
+        --glass-strong: oklch(0.985 0.01 88 / 0.98);
+        --glass-border: oklch(0.23 0.015 60 / 0.88);
+        --glass-border-hover: var(--accent);
+        --glass-highlight: transparent;
+        --glass-blur: none;
+        --tile: oklch(0.965 0.016 85);
+        --tile-hover: oklch(0.93 0.03 80);
+        --hairline: oklch(0.23 0.015 60 / 0.2);
+        --shadow-sm: 0 0 #0000;
+        --shadow: 3px 3px 0 oklch(0.23 0.015 60 / 0.14);
+        --shadow-lg: 0 24px 50px -28px oklch(0.3 0.03 60 / 0.5);
+        --ring: oklch(0.55 0.19 30);
+
+        --blob-1: oklch(0.9 0.04 80 / 0.55);
+        --blob-2: transparent;
+        --blob-3: oklch(0.88 0.05 70 / 0.45);
+        --blob-4: transparent;
+        --particle: oklch(0.3 0.02 60 / 0.45);
+        --grain-opacity: 0.16;
+        --card-hue: 25;
+        --card-chroma: 0.13;
+
+        --radius-sm: 2px;
+        --radius: 2px;
+        --radius-lg: 3px;
+        --radius-full: 2px;
+        --mark-radius: 50%;
+        --font-heading: var(--font-serif);
+        --heading-weight: 400;
+        --heading-tracking: 0;
+        --title-size: 1.55rem;
+        --section-size: 2rem;
+        --font-numeric: var(--font-serif);
+        --numeric-weight: 400;
+        --numeric-tracking: -0.02em;
+    }
+
+    .theme-dark[data-style="paper"],
+    .theme-dark [data-style="paper"] {
+        color-scheme: dark;
+        --bg: oklch(0.205 0.012 60);
+        --ink: oklch(0.93 0.02 85);
+        --muted: oklch(0.76 0.02 80);
+        --subtle: oklch(0.62 0.02 75);
+        --accent: oklch(0.72 0.15 38);
+        --accent-2: oklch(0.6 0.13 30);
+        --accent-3: oklch(0.78 0.1 80);
+        --accent-fg: oklch(0.2 0.012 60);
+        --ink-mix: white;
+
+        --glass: oklch(0.24 0.012 60);
+        --glass-strong: oklch(0.24 0.012 60 / 0.98);
+        --glass-border: oklch(0.93 0.02 85 / 0.55);
+        --tile: oklch(0.27 0.012 60);
+        --tile-hover: oklch(0.31 0.015 60);
+        --hairline: oklch(0.93 0.02 85 / 0.14);
+        --shadow: 3px 3px 0 oklch(0 0 0 / 0.35);
+        --shadow-lg: 0 24px 50px -24px oklch(0 0 0 / 0.8);
+        --ring: oklch(0.75 0.14 38);
+
+        --blob-1: oklch(0.3 0.03 70 / 0.5);
+        --blob-3: oklch(0.3 0.04 50 / 0.4);
+        --particle: oklch(0.9 0.02 85 / 0.35);
+        --grain-opacity: 0.12;
+    }
+
+    /* ---- NEON — a glowing grid floor, pink and cyan outlines; best at night ---- */
+    [data-style="neon"] {
+        color-scheme: light;
+        --bg: oklch(0.965 0.02 320);
+        --backdrop-base: var(--bg);
+        --grid-line: oklch(0.65 0.24 340 / 0.35);
+        --page-bg:
+            linear-gradient(var(--grid-line) 2px, transparent 2px) 0 0 / 100% 56px,
+            linear-gradient(90deg, var(--grid-line) 2px, transparent 2px) 50% 0 / 72px 100%;
+        --art-mask: linear-gradient(#000 0 0);
+        --ink: oklch(0.22 0.07 300);
+        --muted: oklch(0.42 0.08 305);
+        --subtle: oklch(0.56 0.07 305);
+        --accent: oklch(0.6 0.26 345);
+        --accent-2: oklch(0.62 0.15 215);
+        --accent-3: oklch(0.75 0.17 85);
+        --accent-fg: oklch(0.99 0 0);
+        --ink-mix: black;
+
+        --glass: oklch(1 0 0 / 0.7);
+        --glass-strong: oklch(0.99 0.01 320 / 0.94);
+        --glass-border: oklch(0.6 0.26 345 / 0.55);
+        --glass-border-hover: oklch(0.62 0.15 215 / 0.9);
+        --glass-highlight: transparent;
+        --glass-blur: blur(12px) saturate(1.4);
+        --tile: oklch(1 0 0 / 0.6);
+        --tile-hover: oklch(1 0 0 / 0.9);
+        --hairline: oklch(0.6 0.2 330 / 0.22);
+        --shadow-sm: 0 0 10px -3px oklch(0.6 0.26 345 / 0.45);
+        --shadow: 0 0 22px -6px oklch(0.6 0.26 345 / 0.5);
+        --shadow-lg: 0 0 40px -10px oklch(0.6 0.26 345 / 0.45), 0 30px 60px -24px oklch(0.3 0.1 300 / 0.4);
+        --ring: oklch(0.62 0.15 215);
+
+        --blob-1: oklch(0.8 0.15 340 / 0.5);
+        --blob-2: oklch(0.85 0.1 210 / 0.5);
+        --blob-3: oklch(0.88 0.12 330 / 0.45);
+        --blob-4: oklch(0.75 0.15 300 / 0.4);
+        --particle: oklch(0.55 0.24 340);
+        --grain-opacity: 0.03;
+        --card-hue: 330;
+        --card-chroma: 0.2;
+
+        --radius-sm: 0.5rem;
+        --radius: 0.75rem;
+        --radius-lg: 1rem;
+        --mark-radius: 25%;
+        --heading-weight: 750;
+        --heading-tracking: -0.02em;
+        --numeric-weight: 700;
+        --font-display: var(--font-sans);
+        --fs-display: clamp(2.75rem, 1.8rem + 4vw, 5rem);
+        --fs-display-sub: clamp(1.25rem, 1rem + 1vw, 1.75rem);
+        --display-weight: 800;
+        --display-tracking: -0.05em;
+        --display-sub-style: normal;
+    }
+
+    .theme-dark[data-style="neon"],
+    .theme-dark [data-style="neon"] {
+        color-scheme: dark;
+        --bg: oklch(0.14 0.04 295);
+        --grid-line: oklch(0.7 0.27 340 / 0.6);
+        --ink: oklch(0.97 0.02 320);
+        --muted: oklch(0.8 0.05 310);
+        --subtle: oklch(0.64 0.07 305);
+        --accent: oklch(0.74 0.24 345);
+        --accent-2: oklch(0.84 0.14 200);
+        --accent-3: oklch(0.9 0.17 95);
+        --accent-fg: oklch(0.14 0.04 295);
+        --ink-mix: white;
+
+        --glass: oklch(0.17 0.045 295 / 0.68);
+        --glass-strong: oklch(0.16 0.045 295 / 0.95);
+        --glass-border: oklch(0.74 0.24 345 / 0.6);
+        --glass-border-hover: oklch(0.84 0.14 200 / 0.95);
+        --tile: oklch(0.2 0.05 295 / 0.6);
+        --tile-hover: oklch(0.25 0.06 295 / 0.8);
+        --hairline: oklch(0.74 0.2 330 / 0.22);
+        --shadow-sm: 0 0 12px -3px oklch(0.74 0.24 345 / 0.6);
+        --shadow: 0 0 26px -6px oklch(0.74 0.24 345 / 0.55);
+        --shadow-lg: 0 0 44px -8px oklch(0.74 0.24 345 / 0.5), 0 30px 60px -20px oklch(0 0 0 / 0.9);
+        --ring: oklch(0.84 0.14 200);
+
+        --blob-1: oklch(0.45 0.25 340 / 0.45);
+        --blob-2: oklch(0.5 0.15 200 / 0.3);
+        --blob-3: oklch(0.5 0.24 330 / 0.4);
+        --blob-4: oklch(0.4 0.2 290 / 0.4);
+        --particle: oklch(0.9 0.08 200);
+        --grain-opacity: 0.05;
+    }
+
+    /* ---- BOLD — chunky borders, hard shadows, bright tiles on a dotted page ---- */
+    [data-style="bold"] {
+        color-scheme: light;
+        --bg: oklch(0.965 0.035 95);
+        --backdrop-base: var(--bg);
+        --dot: oklch(0.25 0.02 270 / 0.2);
+        --page-bg: radial-gradient(var(--dot) 1.3px, transparent 1.7px) 0 0 / 22px 22px;
+        --art-mask: linear-gradient(#000 0 0);
+        --ink: oklch(0.2 0.02 270);
+        --muted: oklch(0.36 0.02 270);
+        --subtle: oklch(0.5 0.02 270);
+        --accent: oklch(0.52 0.25 268);
+        --accent-2: oklch(0.68 0.23 355);
+        --accent-3: oklch(0.89 0.17 100);
+        --accent-fg: oklch(0.99 0 0);
+        --ink-mix: black;
+
+        --glass: oklch(1 0 0);
+        --glass-strong: oklch(1 0 0);
+        --glass-border: var(--ink);
+        --glass-border-hover: var(--ink);
+        --glass-highlight: transparent;
+        --glass-blur: none;
+        --tile: oklch(1 0 0);
+        --tile-hover: oklch(0.97 0.04 95);
+        --hairline: oklch(0.2 0.02 270 / 0.22);
+        --hard: var(--ink); /* the colour of the hard shadows */
+        --shadow-sm: 2px 2px 0 var(--hard);
+        --shadow: 5px 5px 0 var(--hard);
+        --shadow-lg: 8px 8px 0 var(--hard);
+        --ring: oklch(0.52 0.25 268);
+
+        --blob-1: transparent;
+        --blob-2: transparent;
+        --blob-3: transparent;
+        --blob-4: transparent;
+        --particle: oklch(0.2 0.02 270 / 0.55);
+        --grain-opacity: 0;
+        --card-hue: 265;
+        --card-chroma: 0.2;
+
+        --border-w: 2px;
+        --radius-sm: 0.4rem;
+        --radius: 0.6rem;
+        --radius-lg: 0.9rem;
+        --mark-radius: 20%;
+        --heading-weight: 800;
+        --heading-tracking: -0.035em;
+        --title-size: 1.2rem;
+        --section-size: 1.5rem;
+        --numeric-weight: 800;
+        --font-display: var(--font-sans);
+        --fs-display: clamp(2.75rem, 1.8rem + 4vw, 5rem);
+        --fs-display-sub: clamp(1.25rem, 1rem + 1vw, 1.75rem);
+        --display-weight: 850;
+        --display-tracking: -0.055em;
+        --display-sub-style: normal;
+    }
+
+    .theme-dark[data-style="bold"],
+    .theme-dark [data-style="bold"] {
+        color-scheme: dark;
+        --bg: oklch(0.21 0.02 270);
+        --dot: oklch(0.95 0.02 95 / 0.12);
+        --ink: oklch(0.97 0.015 95);
+        --muted: oklch(0.82 0.015 95);
+        --subtle: oklch(0.66 0.015 95);
+        --accent: oklch(0.72 0.18 268);
+        --accent-2: oklch(0.75 0.2 355);
+        --accent-3: oklch(0.9 0.17 100);
+        --accent-fg: oklch(0.2 0.02 270);
+        --ink-mix: white;
+
+        --glass: oklch(0.26 0.02 270);
+        --glass-strong: oklch(0.26 0.02 270);
+        --glass-border-hover: var(--accent-3);
+        --tile: oklch(0.29 0.02 270);
+        --tile-hover: oklch(0.33 0.025 270);
+        --hairline: oklch(0.97 0.015 95 / 0.2);
+        --hard: var(--accent-3);
+        --shadow-lg: 8px 8px 0 oklch(0 0 0 / 0.6);
+        --ring: var(--accent-3);
+        --particle: oklch(0.97 0.015 95 / 0.5);
     }
 
     /* elements carrying an environment set --env inline; --env-ink is its readable text color in this theme */

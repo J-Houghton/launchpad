@@ -13,15 +13,20 @@ const VERSION = process.env.LAUNCHPAD_VERSION || `${PACKAGE_VERSION}-dev`;
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * Loads launchpad.config.js before the app. It's a plain (non-module) script so it
- * also works when index.html is opened straight from disk, where fetch() can't read files.
+ * Loads launchpad.config.js before the app, where index.html marks the spot (ahead of the script that
+ * applies the page's look). It's a plain (non-module) script so it also works when index.html is opened
+ * straight from disk, where fetch() can't read files.
  */
 function configScript(): Plugin {
+  const marker = '<!-- launchpad.config.js -->';
   return {
     name: 'launchpad-config-script',
     transformIndexHtml: {
       order: 'post',
-      handler: () => [{ tag: 'script', attrs: { src: './launchpad.config.js' }, injectTo: 'head' }],
+      handler: html => {
+        if (!html.includes(marker)) throw new Error(`index.html needs a ${marker} line`);
+        return html.replace(marker, '<script src="./launchpad.config.js"></script>');
+      },
     },
   };
 }
@@ -79,9 +84,10 @@ function saveConfigFile(): Plugin {
         });
         req.on('end', async () => {
           try {
-            const json = body.slice(body.indexOf('{'), body.lastIndexOf('}') + 1);
-            const data = JSON.parse(json);
-            if (!body.includes('window.LAUNCHPAD_CONFIG') || typeof data !== 'object' || !Array.isArray(data.apps)) {
+            // the JSON after the assignment (the comments above it may hold braces of their own)
+            const at = body.search(/LAUNCHPAD_CONFIG\s*=/);
+            const data = JSON.parse(body.slice(body.indexOf('{', at), body.lastIndexOf('}') + 1));
+            if (at < 0 || typeof data !== 'object' || !Array.isArray(data.cards)) {
               return reply(400, 'That doesn\'t look like a launchpad config');
             }
             await writeFile(CONFIG_FILE, body, 'utf8');

@@ -2,7 +2,7 @@
 MENU + TOAST (top-layer popovers)
 ================================*/
 @layer components {
-    .env-menu {
+    .tile-menu {
         inset: auto;
         margin: 0;
         width: 17.5rem;
@@ -28,21 +28,21 @@ MENU + TOAST (top-layer popovers)
             overlay var(--dur-fast) allow-discrete;
     }
 
-    .env-menu:popover-open {
+    .tile-menu:popover-open {
         opacity: 1;
         scale: 1;
     }
 
     @starting-style {
-        .env-menu:popover-open {
+        .tile-menu:popover-open {
             opacity: 0;
             scale: 0.95;
         }
     }
 
     /* anchor positioning: sit under the ⋯ button, flipping if there's no room */
-    .env-menu.anchored {
-        position-anchor: --env-menu-anchor;
+    .tile-menu.anchored {
+        position-anchor: --tile-menu-anchor;
         position-area: bottom span-left;
         position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
         margin-block: 0.375rem;

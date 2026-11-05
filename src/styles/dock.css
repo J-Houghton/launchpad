@@ -1,15 +1,8 @@
 /* ===============================
-DOCK — pinned + recent
+DOCK — pinned + recent, each a section of the page
 ================================*/
 @layer components {
-    .dock {
-        display: grid;
-        gap: var(--space-2);
-    }
-
-    @media (width >= 56rem) {
-        .dock { grid-template-columns: 3fr 2fr; }
-    }
+    quick-dock { display: grid; }
 
     .panel {
         display: flex;
@@ -31,6 +24,7 @@ DOCK — pinned + recent
         display: flex;
         align-items: center;
         gap: 0.45rem;
+        font-family: var(--font-label);
         font-size: 0.6875rem;
         font-weight: 600;
         letter-spacing: 0.08em;
@@ -92,7 +86,7 @@ DOCK — pinned + recent
         height: 2.25rem;
         padding: 0 0.8rem 0 0.75rem;
         border-radius: var(--radius-full);
-        border: 1px solid color-mix(in oklch, var(--env) 30%, var(--hairline));
+        border: 1px solid color-mix(in oklab, var(--env) 30%, var(--hairline));
         background: var(--tile);
         font-size: var(--fs-sm);
         white-space: nowrap;
@@ -104,9 +98,9 @@ DOCK — pinned + recent
     }
 
     .chip:hover {
-        background: color-mix(in oklch, var(--env) 12%, var(--tile-hover));
-        border-color: color-mix(in oklch, var(--env) 55%, transparent);
-        box-shadow: 0 8px 20px -10px color-mix(in oklch, var(--env) 70%, transparent);
+        background: color-mix(in oklab, var(--env) 12%, var(--tile-hover));
+        border-color: color-mix(in oklab, var(--env) 55%, transparent);
+        box-shadow: 0 8px 20px -10px color-mix(in oklab, var(--env) 70%, transparent);
         translate: 0 -1px;
     }
 
@@ -124,7 +118,7 @@ DOCK — pinned + recent
         font-weight: 700;
         letter-spacing: 0.06em;
         color: var(--env-ink);
-        background: color-mix(in oklch, var(--env) 16%, transparent);
+        background: color-mix(in oklab, var(--env) 16%, transparent);
     }
 
     .chip-time {

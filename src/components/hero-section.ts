@@ -1,10 +1,10 @@
 // src/components/hero-section.ts
+// The greeting: the time of day, and a typed headline. The clock and weather are sections of their own.
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { config, primaryTimeZone } from '../config.js';
 import { StoreController } from '../lib/store-controller.js';
-import './clock-widget.js';
-import './weather-widget.js';
+import { reducedMotion } from '../lib/transition.js';
 
 const hourIn = (timeZone: string) =>
   Number(new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
@@ -35,7 +35,7 @@ export class HeroSection extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    if (!config.widgets.greeting.typing || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (!config.widgets.greeting.typing || reducedMotion()) {
       this.phase = 'done';
     } else {
       this.#schedule(650); // let the entrance animation land first
@@ -48,6 +48,15 @@ export class HeroSection extends LitElement {
     clearTimeout(this.#timer);
     clearInterval(this.#greetingTimer);
     super.disconnectedCallback();
+  }
+
+  // the greeting changed while it was being typed out (say, an example was loaded): just show it
+  willUpdate() {
+    const { title, subtitle } = config.widgets.greeting;
+    if (this.phase !== 'done' && !(title.startsWith(this.typedTitle) && subtitle.startsWith(this.typedSub))) {
+      clearTimeout(this.#timer);
+      this.phase = 'done';
+    }
   }
 
   #schedule(ms: number) {
@@ -69,34 +78,25 @@ export class HeroSection extends LitElement {
   };
 
   render() {
-    const { greeting: g, clock, weather } = config.widgets;
-    if (!g.enabled && !clock.enabled && !weather.enabled) return nothing;
-    const { title, subtitle } = g;
+    const { title, subtitle } = config.widgets.greeting;
     const done = this.phase === 'done'; // once typed, follow config edits directly
-    const widgets = Number(clock.enabled) + Number(weather.enabled);
     // the invisible "ghost" copy reserves the final size so nothing shifts while typing
     return html`
       <section class="hero" aria-label="Welcome">
-        ${g.enabled ? html`
-          <div class="hero-copy">
-            <p class="eyebrow enter" style="--i:0"><span class="eyebrow-dot"></span>${greeting()}</p>
-            <h1 class="hero-title type-stack enter" style="--i:1">
-              <span class="visually-hidden">${title}</span>
-              <span class="type-ghost" aria-hidden="true">${title}</span>
-              <span class="type-live ${this.phase === 'title' ? 'has-caret' : ''}" aria-hidden="true">${done ? title : this.typedTitle}</span>
-            </h1>
-            ${subtitle ? html`
-              <p class="hero-sub type-stack enter" style="--i:2">
-                <span class="visually-hidden">${subtitle}</span>
-                <span class="type-ghost" aria-hidden="true">${subtitle}</span>
-                <span class="type-live ${this.phase === 'title' ? '' : 'has-caret'}" aria-hidden="true">${done ? subtitle : this.typedSub}</span>
-              </p>` : nothing}
-          </div>` : nothing}
-        ${widgets ? html`
-          <div class="hero-widgets" style="--widgets:${widgets}">
-            ${clock.enabled ? html`<clock-widget class="widget glass enter" style="--i:3"></clock-widget>` : nothing}
-            ${weather.enabled ? html`<weather-widget class="widget glass enter" style="--i:4"></weather-widget>` : nothing}
-          </div>` : nothing}
+        <div class="hero-copy">
+          <p class="eyebrow enter" style="--i:0"><span class="eyebrow-dot"></span>${greeting()}</p>
+          <h1 class="hero-title type-stack enter" style="--i:1">
+            <span class="visually-hidden">${title}</span>
+            <span class="type-ghost" aria-hidden="true">${title}</span>
+            <span class="type-live ${this.phase === 'title' ? 'has-caret' : ''}" aria-hidden="true">${done ? title : this.typedTitle}</span>
+          </h1>
+          ${subtitle ? html`
+            <p class="hero-sub type-stack enter" style="--i:2">
+              <span class="visually-hidden">${subtitle}</span>
+              <span class="type-ghost" aria-hidden="true">${subtitle}</span>
+              <span class="type-live ${this.phase === 'title' ? '' : 'has-caret'}" aria-hidden="true">${done ? subtitle : this.typedSub}</span>
+            </p>` : nothing}
+        </div>
       </section>
     `;
   }

@@ -1,9 +1,9 @@
-// src/components/env-menu.ts
-// One shared quick-actions popover for every environment tile and chip.
+// src/components/tile-menu.ts
+// One shared quick-actions popover for every tile and chip.
 // It lives in the top layer (Popover API) and is placed with CSS anchor positioning.
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { config, type EnvRef } from '../config.js';
+import { config, type TileRef } from '../config.js';
 import { prefs } from '../lib/prefs.js';
 import { health, healthLabel } from '../lib/health.js';
 import { StoreController } from '../lib/store-controller.js';
@@ -14,21 +14,28 @@ import { ago, copyText, toast } from '../lib/util.js';
 type Point = { x: number; y: number };
 
 const supportsAnchor = CSS.supports('anchor-name: --a');
-let instance: EnvMenu | undefined;
+let instance: TileMenu | undefined;
 
-export function openEnvMenu(key: string, anchor: HTMLElement, point?: Point) {
+export function openTileMenu(key: string, anchor: HTMLElement, point?: Point) {
   instance?.open(key, anchor, point);
 }
 
-/** Right-click (or the keyboard context-menu key) on anything that represents an environment. */
-export const onEnvContextMenu = (key: string) => (e: MouseEvent) => {
+/** Right-click (or the keyboard context-menu key) on anything that represents a tile. */
+export const onTileContextMenu = (key: string) => (e: MouseEvent) => {
   e.preventDefault();
   const fromKeyboard = e.clientX === 0 && e.clientY === 0;
-  openEnvMenu(key, e.currentTarget as HTMLElement, fromKeyboard ? undefined : { x: e.clientX, y: e.clientY });
+  openTileMenu(key, e.currentTarget as HTMLElement, fromKeyboard ? undefined : { x: e.clientX, y: e.clientY });
 };
 
-@customElement('env-menu')
-export class EnvMenu extends LitElement {
+/** How a tile is named: a column tile by its card ("Billing · DEV"), any other tile by itself. */
+export function tileTitle({ card, tile }: TileRef) {
+  return tile.column
+    ? { primary: card.name, secondary: tile.name }
+    : { primary: tile.name || tile.host, secondary: card.name };
+}
+
+@customElement('tile-menu')
+export class TileMenu extends LitElement {
   protected createRenderRoot() { return this; }
 
   @state() private key?: string;
@@ -52,7 +59,7 @@ export class EnvMenu extends LitElement {
     super.disconnectedCallback();
   }
 
-  get #menu() { return this.querySelector<HTMLElement>('.env-menu')!; }
+  get #menu() { return this.querySelector<HTMLElement>('.tile-menu')!; }
 
   async open(key: string, anchor: HTMLElement, point?: Point) {
     // the click on a ⋯ button that light-dismissed this menu shouldn't reopen it straight away
@@ -69,7 +76,7 @@ export class EnvMenu extends LitElement {
     menu.classList.toggle('anchored', anchored);
     menu.style.removeProperty('left');
     menu.style.removeProperty('top');
-    if (anchored) anchor.style.setProperty('anchor-name', '--env-menu-anchor');
+    if (anchored) anchor.style.setProperty('anchor-name', '--tile-menu-anchor');
     menu.showPopover();
     if (!anchored) this.#placeAt(point ?? this.#below(anchor));
     menu.querySelector<HTMLElement>('.menu-item')?.focus();
@@ -122,7 +129,9 @@ export class EnvMenu extends LitElement {
       </button>`;
   }
 
-  #body({ key, app, env }: EnvRef) {
+  #body(ref: TileRef) {
+    const { key, tile } = ref;
+    const { primary, secondary } = tileTitle(ref);
     const h = health.get(key);
     const pinned = prefs.isPinned(key);
     const togglePin = () => {
@@ -135,13 +144,13 @@ export class EnvMenu extends LitElement {
     };
 
     return html`
-      <div class="menu-head" data-env style="--env:${env.color}">
+      <div class="menu-head" data-env style="--env:${tile.color}">
         <div class="menu-title">
-          <span class="env-tag">${env.label}</span>
-          <span>${app.name}</span>
-          <span class="menu-name">${env.name}</span>
+          ${tile.label ? html`<span class="env-tag">${tile.label}</span>` : nothing}
+          <span>${primary}</span>
+          ${secondary ? html`<span class="menu-name">${secondary}</span>` : nothing}
         </div>
-        <code class="menu-host">${env.host}</code>
+        <code class="menu-host">${tile.host}</code>
       </div>
       <div class="menu-status">
         <span class="status-dot" data-state=${h.state} ?data-pending=${h.pending}></span>
@@ -151,26 +160,27 @@ export class EnvMenu extends LitElement {
       </div>
       <div class="menu-sep" role="separator"></div>
       ${this.#item(ExternalLink, 'Open in new tab', () => {
-        window.open(env.url, '_blank', 'noopener');
+        window.open(tile.url, '_blank', 'noopener');
         transition(() => prefs.recordOpen(key));
       })}
       ${this.#item(ArrowRight, 'Open in this tab', () => {
         prefs.recordOpen(key);
-        location.href = env.url;
+        location.href = tile.url;
       })}
       <div class="menu-sep" role="separator"></div>
-      ${this.#item(Link, 'Copy URL', () => copy(env.url, 'URL'))}
-      ${this.#item(Copy, 'Copy host', () => copy(env.host, env.host))}
+      ${this.#item(Link, 'Copy URL', () => copy(tile.url, 'URL'))}
+      ${this.#item(Copy, 'Copy host', () => copy(tile.host, tile.host))}
       <div class="menu-sep" role="separator"></div>
       ${this.#item(pinned ? PinOff : Pin, pinned ? 'Unpin' : 'Pin to top', togglePin)}
     `;
   }
 
   render() {
-    const ref = this.key ? config.envs.get(this.key) : undefined;
+    const ref = this.key ? config.tiles.get(this.key) : undefined;
+    const title = ref ? tileTitle(ref) : undefined;
     return html`
-      <div class="env-menu" popover role="dialog"
-           aria-label=${ref ? `${ref.app.name} ${ref.env.label} actions` : 'Environment actions'}
+      <div class="tile-menu" popover role="dialog"
+           aria-label=${ref ? `${title!.primary} ${ref.tile.label} actions`.replace(/\s+/g, ' ') : 'Link actions'}
            @keydown=${this.#onKeyDown} @beforetoggle=${this.#onBeforeToggle} @toggle=${this.#onToggle}>
         ${ref ? this.#body(ref) : nothing}
       </div>

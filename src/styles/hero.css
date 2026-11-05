@@ -2,26 +2,16 @@
 HERO — typed headline + clock/weather
 ================================*/
 @layer components {
-    .hero {
-        display: grid;
-        gap: var(--space-4);
-        align-items: end;
-        padding-block: clamp(1.25rem, 3.5vw, 2.5rem) clamp(0.25rem, 1vw, 0.75rem);
-    }
-
-    @media (width >= 60rem) {
-        .hero { grid-template-columns: minmax(0, 1fr) auto; }
-    }
+    /* the greeting sits at the foot of its row, level with the clock and weather beside it */
+    .hero { padding-bottom: clamp(0.25rem, 1vw, 0.75rem); }
 
     /* scroll-driven: the headline recedes as you scroll away from it */
     @supports (animation-timeline: scroll()) {
-        @media (prefers-reduced-motion: no-preference) {
-            .hero-copy {
-                transform-origin: left bottom;
-                animation: hero-recede linear both;
-                animation-timeline: scroll(root);
-                animation-range: 0 55vh;
-            }
+        [data-motion="full"] .hero-copy {
+            transform-origin: left bottom;
+            animation: hero-recede linear both;
+            animation-timeline: scroll(root);
+            animation-range: 0 55vh;
         }
     }
 
@@ -73,8 +63,8 @@ HERO — typed headline + clock/weather
     .type-ghost { visibility: hidden; }
 
     .hero-title {
-        font: 400 var(--fs-display)/1 var(--font-display);
-        letter-spacing: -0.02em;
+        font: var(--display-weight) var(--fs-display)/1 var(--font-display);
+        letter-spacing: var(--display-tracking);
     }
 
     .hero-title .type-live {
@@ -91,7 +81,7 @@ HERO — typed headline + clock/weather
 
     .hero-sub {
         margin-top: 0.4rem;
-        font: italic 400 var(--fs-display-sub)/1.2 var(--font-display);
+        font: var(--display-sub-style) 400 var(--fs-display-sub)/1.2 var(--font-display);
         color: var(--muted);
     }
 
@@ -112,16 +102,6 @@ HERO — typed headline + clock/weather
     }
 
     /* ---- widgets ---- */
-    .hero-widgets {
-        display: grid;
-        grid-template-columns: repeat(var(--widgets, 2), minmax(0, 1fr));
-        gap: var(--space-2);
-    }
-
-    @media (width >= 60rem) {
-        .hero-widgets { grid-template-columns: repeat(var(--widgets, 2), 13.75rem); }
-    }
-
     .widget {
         display: flex;
         flex-direction: column;
@@ -136,6 +116,7 @@ HERO — typed headline + clock/weather
         align-items: center;
         gap: 0.4rem;
         margin-bottom: 0.15rem;
+        font-family: var(--font-label);
         font-size: 0.6875rem;
         font-weight: 600;
         letter-spacing: 0.08em;
@@ -155,9 +136,10 @@ HERO — typed headline + clock/weather
 
     .clock-time,
     .weather-temp {
+        font-family: var(--font-numeric);
         font-size: 2.75rem;
-        font-weight: 600;
-        letter-spacing: -0.045em;
+        font-weight: var(--numeric-weight);
+        letter-spacing: var(--numeric-tracking);
         line-height: 1.1;
         font-variant-numeric: tabular-nums;
     }
@@ -262,5 +244,86 @@ HERO — typed headline + clock/weather
 
     @keyframes bob {
         50% { translate: 0 -3px; }
+    }
+
+    /* ---- added widgets (components/added-widgets.ts): an embedded page, or data through a template ---- */
+    .widget-title {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .widget-label .icon-btn { margin-block: -0.4rem; }
+    .widget-label .icon-btn .icon { color: var(--muted); }
+
+    .widget-open {
+        display: grid;
+        place-items: center;
+        margin: -0.3rem -0.3rem -0.3rem auto;
+        padding: 0.3rem;
+        border-radius: 0.5rem;
+        color: var(--muted);
+        transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+    }
+
+    .widget-open:hover { color: var(--ink); background: var(--tile-hover); }
+    .widget-label .widget-open .icon { color: inherit; }
+
+    .embed-frame {
+        display: block;
+        width: 100%;
+        margin-top: 0.4rem;
+        border: 0;
+        border-radius: var(--radius-sm);
+        background: var(--tile);
+    }
+
+    .data-body {
+        min-width: 0;
+        font-size: var(--fs-sm);
+        line-height: 1.55;
+        overflow-wrap: anywhere;
+    }
+
+    .data-body:empty { display: none; }
+    .data-body :is(ul, ol) { display: grid; gap: 0.35rem; padding: 0; list-style: none; }
+    .data-body :is(p, ul, ol, table, pre) + * { margin-top: 0.5rem; }
+    .data-body a { color: var(--accent); font-weight: 600; text-decoration: none; }
+    .data-body a:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .data-body :is(small, .muted) { color: var(--subtle); }
+    .data-body img { max-width: 100%; height: auto; border-radius: var(--radius-sm); }
+    .data-body table { width: 100%; border-collapse: collapse; }
+    .data-body :is(th, td) { padding: 0.25rem 0.5rem 0.25rem 0; border-bottom: 1px solid var(--hairline); text-align: left; }
+    .data-body code { font: 0.8125rem var(--font-mono); }
+
+    /* a list where each item is a row, as most templates want */
+    .data-body .data-list li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 0.75rem; }
+
+    .data-raw {
+        max-height: 16rem;
+        margin: 0;
+        overflow: auto;
+        padding: 0.6rem 0.75rem;
+        border-radius: var(--radius-sm);
+        background: var(--tile);
+        font: 0.75rem/1.5 var(--font-mono);
+        white-space: pre-wrap;
+    }
+
+    .data-error {
+        font-size: var(--fs-sm);
+        color: var(--bad);
+    }
+
+    /* an extension's widget draws its own body; a bare one (a search box, say) has no panel of its own either */
+    .extension-body { min-width: 0; }
+
+    extension-widget[data-bare].glass {
+        padding: 0;
+        border: 0;
+        background: none;
+        box-shadow: none;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
     }
 }

@@ -1,5 +1,5 @@
 // src/lib/prefs.ts
-// "My view": pinned + recently opened environments and hidden apps, saved in this browser.
+// "My view": pinned + recently opened tiles, hidden cards and folded groups, saved in this browser.
 export type Recent = { key: string; at: number };
 
 const PINS = 'launchpad:pins';
@@ -24,7 +24,7 @@ function save(storageKey: string, value: unknown) {
 class Prefs extends EventTarget {
   pins: string[] = [];
   recents: Recent[] = [];
-  /** App ids hidden from this browser's view of the page. */
+  /** Card ids hidden from this browser's view of the page. */
   hidden: string[] = [];
   /** Group ids folded shut in this browser. */
   collapsed: string[] = [];
@@ -64,10 +64,10 @@ class Prefs extends EventTarget {
     this.#emit();
   }
 
-  isHidden(appId: string) { return this.hidden.includes(appId); }
+  isHidden(cardId: string) { return this.hidden.includes(cardId); }
 
-  setHidden(appId: string, hidden: boolean) {
-    this.hidden = hidden ? [...new Set([...this.hidden, appId])] : this.hidden.filter(id => id !== appId);
+  setHidden(cardId: string, hidden: boolean) {
+    this.hidden = hidden ? [...new Set([...this.hidden, cardId])] : this.hidden.filter(id => id !== cardId);
     save(HIDDEN, this.hidden);
     this.#emit();
   }
@@ -80,7 +80,7 @@ class Prefs extends EventTarget {
     this.#emit();
   }
 
-  // entries for apps/environments/groups that no longer exist are skipped when rendering
+  // entries for cards, tiles or groups that no longer exist are skipped when rendering
   #load() {
     this.pins = load<string>(PINS).filter(k => typeof k === 'string');
     this.recents = load<Recent>(RECENTS).filter(r => typeof r?.key === 'string');

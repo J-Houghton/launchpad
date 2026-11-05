@@ -3,6 +3,7 @@ import { LitElement, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { config, primaryTimeZone } from '../config.js';
 import { StoreController } from '../lib/store-controller.js';
+import { openSettings } from './settings-panel.js';
 import {
   Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudMoon, CloudRain, CloudSnow, CloudSun,
   MapPin, Moon, Sun, icon, type IconNode,
@@ -63,7 +64,8 @@ export class WeatherWidget extends LitElement {
   }
 
   #fetch = async () => {
-    const { latitude, longitude } = config.widgets.weather;
+    const { latitude, longitude, place } = config.widgets.weather;
+    if (!place) return;
     const params = new URLSearchParams({
       latitude: String(latitude),
       longitude: String(longitude),
@@ -93,7 +95,14 @@ export class WeatherWidget extends LitElement {
 
   render() {
     const w = this.weather;
-    const label = html`<div class="widget-label">${icon(MapPin)}${config.widgets.weather.place}</div>`;
+    const { place } = config.widgets.weather;
+    if (!place) {
+      return html`
+        <div class="widget-label">${icon(MapPin)}Weather</div>
+        <div class="weather-now"><span class="weather-temp muted">—</span></div>
+        <button class="widget-foot link-btn" type="button" @click=${() => openSettings('widgets')}>Choose a place</button>`;
+    }
+    const label = html`<div class="widget-label">${icon(MapPin)}${place}</div>`;
 
     if (!w) {
       return this.failed
