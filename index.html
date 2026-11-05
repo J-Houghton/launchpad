@@ -6,15 +6,40 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <title>Launchpad</title>
+    <!-- launchpad.config.js -->
     <script>
-      // apply the saved (or OS) theme and palette before first paint so there's no flash
+      // apply the look before the first paint, so there's no flash: what you picked in Settings → My view,
+      // or else the page's own (this browser's edited copy of the config, or launchpad.config.js).
+      // src/lib/look.ts does the same once the page is running — keep the two in step.
       (() => {
-        const read = key => { try { return localStorage.getItem(key); } catch { return null; } };
-        const saved = read('theme');
-        const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+        const get = key => { try { return localStorage.getItem(key); } catch { return null; } };
+        const json = key => { try { return JSON.parse(get(key)); } catch { return null; } };
+        const os = query => matchMedia(query).matches;
+        const oneOf = (value, options, fallback) => (options.includes(value) ? value : fallback);
+        // older versions kept just the theme (once toggled) and the palette
+        const mine = json('launchpad:look') ?? { theme: get('theme'), style: get('palette') === 'classic' ? 'classic' : null };
+        const page = json('launchpad:config')?.data ?? window.LAUNCHPAD_CONFIG ?? {};
+        const look = page.look ?? {};
+        const pick = (key, options, fallback) => oneOf(mine[key], options, oneOf(look[key], options, fallback));
+
+        const theme = pick('theme', ['system', 'light', 'dark'], 'system');
+        const dark = theme === 'system' ? os('(prefers-color-scheme: dark)') : theme === 'dark';
         const root = document.documentElement;
         root.classList.add(dark ? 'theme-dark' : 'theme-light');
-        root.dataset.palette = read('palette') === 'classic' ? 'classic' : 'aurora'; // Aurora unless Classic was picked
+        root.dataset.style = pick('style', ['aurora', 'classic', 'blueprint', 'paper', 'neon', 'bold'], 'aurora');
+        // particles, still, plain, or one an extension adds
+        const isName = v => typeof v === 'string' && /^[a-z][a-z0-9-]{0,40}$/.test(v);
+        root.dataset.background = isName(mine.background) ? mine.background : isName(look.background) ? look.background : 'particles';
+        const calm = mine.motion === 'reduced' || (mine.motion !== 'full' && os('(prefers-reduced-motion: reduce)'));
+        root.dataset.motion = calm ? 'reduced' : 'full';
+        root.dataset.density = oneOf(page.layout?.density, ['comfortable', 'compact'], 'comfortable');
+
+        // the page's custom CSS (src/lib/custom-css.ts), unless ?safe is in the address
+        const css = [].concat(look.css ?? []).filter(line => typeof line === 'string').join('\n');
+        if (css.trim() && !new URLSearchParams(location.search).has('safe')) {
+          const style = Object.assign(document.createElement('style'), { id: 'launchpad-custom-css', textContent: css });
+          document.head.append(style);
+        }
       })();
     </script>
   </head>

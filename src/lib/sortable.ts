@@ -3,11 +3,18 @@
 //
 // Markup: a list element with data-sort-list="<id>", whose direct children marked
 // [data-sort-item] can be moved, each with a [data-sort-handle] button. Lists that share
-// data-sort-group="<name>" accept each other's items (e.g. apps moving between groups).
+// data-sort-group="<name>" accept each other's items (e.g. cards moving between groups).
+// A list with data-sort-axis="grid" lays its items out in rows (the page layout), so drops
+// go by position across as well as down, and the left/right arrow keys move items too.
 // Wire the handle's pointerdown to dragToReorder() and its keydown to keyboardReorder();
 // both report the move, and the caller updates its data.
 
-export type SortMove = { from: { list: string; index: number }; to: { list: string; index: number } };
+export type SortMove = {
+  from: { list: string; index: number };
+  to: { list: string; index: number };
+  /** A pointer drop has already shown where it lands; a key press hasn't, so may want animating. */
+  by: 'pointer' | 'keyboard';
+};
 
 const EDGE = 48; // px from a scroll container's edge where dragging starts to scroll it
 
@@ -47,9 +54,14 @@ export function dragToReorder(e: PointerEvent, onMove: (move: SortMove) => void)
   const { item, list, lists } = found;
   const handle = e.currentTarget as HTMLElement;
   const from = { list: list.dataset.sortList!, index: found.index };
-  const scroller = scrollParent(item);
-  const startY = e.clientY;
+  const grid = list.dataset.sortAxis === 'grid';
+  // the page layout has no scrolling box around it, so the page itself scrolls
+  const page = document.scrollingElement as HTMLElement;
+  const scroller = scrollParent(item) ?? (grid ? page : undefined);
+  const bounds = () => (scroller === page ? { top: 0, bottom: innerHeight } : scroller!.getBoundingClientRect());
+  const startX = e.clientX, startY = e.clientY;
   const startScroll = scroller?.scrollTop ?? 0;
+  let pointerX = e.clientX;
   let pointerY = e.clientY;
   let target: { list: HTMLElement; index: number } | undefined;
   let marked: Element[] = [];
@@ -64,12 +76,16 @@ export function dragToReorder(e: PointerEvent, onMove: (move: SortMove) => void)
   // the list under the pointer (or the nearest one), and the slot in it
   const locate = () => {
     const boxes = lists.map(l => ({ l, r: l.getBoundingClientRect() }));
-    const gap = ({ r }: { r: DOMRect }) => (pointerY < r.top ? r.top - pointerY : pointerY > r.bottom ? pointerY - r.bottom : 0);
+    const away = (p: number, lo: number, hi: number) => (p < lo ? lo - p : p > hi ? p - hi : 0);
+    const gap = ({ r }: { r: DOMRect }) => away(pointerY, r.top, r.bottom) + (grid ? away(pointerX, r.left, r.right) : 0);
     const hit = boxes.reduce((best, cur) => (gap(cur) < gap(best) ? cur : best));
     const others = itemsOf(hit.l, item);
+    // in rows, an item comes first if it's on a lower row, or on this row and to the right of the pointer
     let index = others.findIndex(o => {
       const r = o.getBoundingClientRect();
-      return pointerY < r.top + r.height / 2;
+      return grid
+        ? pointerY < r.top || (pointerY <= r.bottom && pointerX < r.left + r.width / 2)
+        : pointerY < r.top + r.height / 2;
     });
     if (index < 0) index = others.length;
 
@@ -82,17 +98,17 @@ export function dragToReorder(e: PointerEvent, onMove: (move: SortMove) => void)
 
   const frame = () => {
     if (scroller) {
-      const r = scroller.getBoundingClientRect();
+      const r = bounds();
       if (pointerY < r.top + EDGE) scroller.scrollTop -= Math.ceil((r.top + EDGE - pointerY) / 4);
       else if (pointerY > r.bottom - EDGE) scroller.scrollTop += Math.ceil((pointerY - (r.bottom - EDGE)) / 4);
     }
     const scrolled = (scroller?.scrollTop ?? 0) - startScroll;
-    item.style.translate = `0 ${pointerY - startY + scrolled}px`;
+    item.style.translate = `${grid ? pointerX - startX : 0}px ${pointerY - startY + scrolled}px`;
     locate();
     raf = requestAnimationFrame(frame);
   };
 
-  const onPointerMove = (ev: PointerEvent) => { pointerY = ev.clientY; };
+  const onPointerMove = (ev: PointerEvent) => { pointerX = ev.clientX; pointerY = ev.clientY; };
 
   const finish = (commit: boolean) => {
     cancelAnimationFrame(raf);
@@ -106,7 +122,7 @@ export function dragToReorder(e: PointerEvent, onMove: (move: SortMove) => void)
     if (!commit || !target) return;
     const to = { list: target.list.dataset.sortList!, index: target.index };
     if (to.list !== from.list || to.index !== from.index) {
-      onMove({ from, to });
+      onMove({ from, to, by: 'pointer' });
       refocus(to.list, to.index);
     }
   };
@@ -122,15 +138,21 @@ export function dragToReorder(e: PointerEvent, onMove: (move: SortMove) => void)
   raf = requestAnimationFrame(frame);
 }
 
-/** ArrowUp / ArrowDown on a handle; in grouped lists, items step across into the neighbouring list. */
+/**
+ * ArrowUp / ArrowDown on a handle (and ArrowLeft / ArrowRight in a grid) move the item one place;
+ * in grouped lists, items step across into the neighbouring list.
+ */
 export function keyboardReorder(e: KeyboardEvent, onMove: (move: SortMove) => void) {
-  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
   const found = locateItem(e.currentTarget as Element);
   if (!found) return;
+  const keys = found.list.dataset.sortAxis === 'grid'
+    ? { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }
+    : { ArrowUp: -1, ArrowDown: 1 };
+  const dir = keys[e.key as keyof typeof keys];
+  if (!dir) return;
   e.preventDefault();
 
   const { list, lists, index } = found;
-  const dir = e.key === 'ArrowUp' ? -1 : 1;
   const from = { list: list.dataset.sortList!, index };
   const count = itemsOf(list).length;
   let to = { list: from.list, index: index + dir };
@@ -140,6 +162,6 @@ export function keyboardReorder(e: KeyboardEvent, onMove: (move: SortMove) => vo
     if (!neighbour) return;
     to = { list: neighbour.dataset.sortList!, index: dir < 0 ? itemsOf(neighbour).length : 0 };
   }
-  onMove({ from, to });
+  onMove({ from, to, by: 'keyboard' });
   refocus(to.list, to.index);
 }

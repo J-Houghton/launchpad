@@ -2,7 +2,7 @@
 #
 #   • Push to main  → type-check + build, deploy to GitHub Pages, and publish a GitHub Release.
 #   • Pull request  → type-check + build only, to catch problems before merging.
-#   • Every run     → the built page (index.html + launchpad.config.js + favicon) is attached
+#   • Every run     → the built page (index.html + launchpad.config.js + favicon + extensions/) is attached
 #                     as a "launchpad" artifact: download it from the run's summary page and
 #                     open index.html straight from disk.
 #

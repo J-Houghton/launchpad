@@ -9,10 +9,11 @@ import {
 import type { LinkIcon, LinkItem } from '../config';
 
 export {
-  AppWindow, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, ChevronDown, ChevronUp, ClipboardPaste,
+  AppWindow, ArrowLeft, ArrowRight, ArrowUpRight, Blend, BookOpen, Briefcase, Check, ChevronDown, ChevronUp, ClipboardPaste,
+  Activity, Braces, Code, Coins, GitBranch, House, Newspaper, Play, Puzzle, MoveHorizontal, PanelTop, Square, Users,
   Clock, Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudMoon, CloudRain, CloudSnow, CloudSun, Copy,
   Download, Ellipsis, ExternalLink, Eye, EyeOff, FileCode, FileSpreadsheet, FolderOpen, FolderPlus, Globe,
-  GripVertical, Layers, Link, Link2, MapPin, Monitor, Moon, Palette, Pencil, Pin, PinOff, Plus, RefreshCw,
+  ChevronLeft, ChevronRight, Columns3, CornerDownLeft, GripVertical, Layers, LayoutGrid, Link, Link2, MapPin, Monitor, Moon, Palette, Pencil, Pin, PinOff, Plus, RefreshCw,
   Rocket, RotateCcw, Save, Search, Settings, SlidersHorizontal, Sparkles, Sun, Trash, TriangleAlert, Type,
   Unlink, Upload, User, X,
 } from 'lucide';
@@ -31,7 +32,7 @@ export function icon(node: IconNode, className = '') {
     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${unsafeSVG(inner)}</svg>`;
 }
 
-// ---- app link icons ----
+// ---- card link icons ----
 
 export const LINK_ICON_NODES: Record<Exclude<LinkIcon, 'auto'>, IconNode> = {
   book: BookOpen, link: Link, git: GitBranch, chart: ChartLine, ticket: Ticket,

@@ -1,23 +1,33 @@
 // src/components/setup-guide.ts
-// A short first-run guide: name the page → pick environments → add a few apps → save.
-// Everything it sets can be changed later in Settings.
+// A short first-run guide: name the page → pick a layout (just links, or a tile per column)
+// → add a few cards → save. Everything it sets can be changed later in Settings. Or skip it
+// all and start from one of the examples (lib/examples.ts).
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import {
-  ENV_PRESETS, LOCAL_TIME_ZONE, STARTER, cityOf, config, isHttpUrl, normalize, validTimeZone, type LaunchpadConfig,
+  COLUMN_PRESETS, LOCAL_TIME_ZONE, STARTER, cardColor, cityOf, config, isHttpUrl, normalize, slug, validTimeZone,
+  type CardConfig, type LaunchpadConfig,
 } from '../config.js';
 import { canWriteDirectly, writeConfigFile } from '../lib/config-file.js';
-import { readAppsCsv } from '../lib/csv.js';
+import { readCardsCsv } from '../lib/csv.js';
+import { EXAMPLES, type Example } from '../lib/examples.js';
 import { transition } from '../lib/transition.js';
 import { ArrowLeft, ArrowRight, Check, ClipboardPaste, Plus, Rocket, Save, Trash, X, icon } from '../lib/icons.js';
 import { toast } from '../lib/util.js';
 
-type Row = { name: string; urls: Record<string, string> };
+/**
+ * One line of the table. With columns it's a card (a name and an address per column);
+ * without, it's a single link filed under a category, which becomes its card.
+ */
+type Row = { category: string; name: string; url: string; tag?: string; urls: Record<string, string> };
 
-const STEPS = ['Name', 'Environments', 'Applications', 'Save'];
+const STEPS = ['Name', 'Layout', 'Cards', 'Save'];
 const TIME_ZONES = Intl.supportedValuesOf?.('timeZone') ?? [];
-const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app';
-const blankRows = (): Row[] => [{ name: '', urls: {} }, { name: '', urls: {} }];
+const JUST_LINKS = -1;
+const DEFAULT_CATEGORY = 'Links';
+const blankRow = (): Row => ({ category: '', name: '', url: '', urls: {} });
+const blankRows = () => [blankRow(), blankRow(), blankRow()];
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 let instance: SetupGuide | undefined;
 
@@ -32,7 +42,8 @@ export class SetupGuide extends LitElement {
   @state() private step = 0;
   @state() private pageTitle = '';
   @state() private timeZone = LOCAL_TIME_ZONE;
-  @state() private preset = 0;
+  /** An index into COLUMN_PRESETS, or JUST_LINKS. */
+  @state() private preset = JUST_LINKS;
   @state() private checks = true;
   @state() private rows: Row[] = blankRows();
   @state() private pasting = false;
@@ -51,16 +62,26 @@ export class SetupGuide extends LitElement {
   }
 
   get #dialog() { return this.querySelector<HTMLDialogElement>('dialog.setup')!; }
-  get #envs() { return ENV_PRESETS[this.preset].environments; }
-  get #named() { return this.rows.filter(r => r.name.trim()); }
+  get #columns() { return this.preset === JUST_LINKS ? [] : COLUMN_PRESETS[this.preset].columns; }
+  get #links() { return this.preset === JUST_LINKS; }
+  /** The rows that will become something: named cards, or links with an address. */
+  get #filled() { return this.rows.filter(r => (this.#links ? r.url.trim() : r.name.trim())); }
+
+  /** Each row's category — a blank one carries on from the row above, like a spreadsheet. */
+  #categories() {
+    let current = DEFAULT_CATEGORY;
+    return this.rows.map(r => (current = r.category.trim() || current));
+  }
 
   async show() {
     const c = config.raw;
     this.step = 0;
     this.pageTitle = c.site.title === STARTER.site.title ? '' : c.site.title;
     this.timeZone = c.widgets.clock.zones[0]?.timeZone ?? LOCAL_TIME_ZONE;
-    const ids = c.environments.map(e => e.id).join();
-    this.preset = Math.max(0, ENV_PRESETS.findIndex(p => p.environments.map(e => e.id).join() === ids));
+    const ids = c.columns.map(e => e.id).join();
+    this.preset = c.useColumns && c.columns.length
+      ? Math.max(0, COLUMN_PRESETS.findIndex(p => p.columns.map(e => e.id).join() === ids))
+      : JUST_LINKS;
     this.checks = c.statusChecks;
     this.rows = blankRows();
     this.pasting = false;
@@ -71,7 +92,8 @@ export class SetupGuide extends LitElement {
   }
 
   #close = () => {
-    if (this.#named.length && !confirm('Close the setup guide? What you\'ve entered will be lost.')) return;
+    const entered = this.rows.some(r => r.name.trim() || r.url.trim() || r.category.trim() || Object.values(r.urls).some(u => u.trim()));
+    if (entered && !confirm('Close the setup guide? What you\'ve entered will be lost.')) return;
     this.#dialog.close();
   };
 
@@ -103,8 +125,14 @@ export class SetupGuide extends LitElement {
     }
     if (this.step === 2 && !this.pasting) {
       for (const [i, row] of this.rows.entries()) {
+        if (this.#links) {
+          const url = row.url.trim();
+          if (!url && !row.name.trim()) continue;
+          if (!isHttpUrl(url)) return this.#complain(`setup:${i}:url`, url ? 'Use a full address starting with https://' : 'Add an address for this link.');
+          continue;
+        }
         const urls = Object.entries(row.urls).filter(([, url]) => url.trim());
-        if (!row.name.trim() && urls.length) return this.#complain(`setup:${i}:name`, 'Give this application a name.');
+        if (!row.name.trim() && urls.length) return this.#complain(`setup:${i}:name`, 'Give this card a name.');
         for (const [env, url] of urls) {
           if (!isHttpUrl(url.trim())) return this.#complain(`setup:${i}:${env}`, 'Use a full address starting with https://');
         }
@@ -132,13 +160,24 @@ export class SetupGuide extends LitElement {
   #usePasted() {
     if (!this.pasted.trim()) { this.pasting = false; return; }
     try {
-      const result = readAppsCsv(this.pasted, { ...config.raw, environments: this.#envs, groups: [], apps: [] });
-      const known = new Set(this.#envs.map(e => e.id));
-      this.rows = result.apps.map(a => ({
-        name: a.name,
-        urls: Object.fromEntries(a.envs.filter(e => known.has(e.env)).map(e => [e.env, e.url])),
-      }));
-      if (result.newEnvs.length) toast(`Skipped columns that aren't in this preset: ${result.newEnvs.map(e => e.label).join(', ')}`, 'error');
+      const columns = this.#columns;
+      const result = readCardsCsv(this.pasted, { ...config.raw, columns, groups: [], cards: [] });
+      if (this.#links) {
+        // every tile becomes a link under its card's name; a column just becomes its tag
+        const label = (column: string) => result.newColumns.find(e => e.id === column)?.label;
+        this.rows = result.cards.flatMap(card => card.tiles.map((t): Row => ({
+          category: card.name, name: t.name ?? '', url: t.url, tag: t.column ? label(t.column) : t.label, urls: {},
+        })));
+      } else {
+        const known = new Set(columns.map(e => e.id));
+        this.rows = result.cards.map(card => ({
+          ...blankRow(),
+          name: card.name,
+          urls: Object.fromEntries(card.tiles.flatMap(t => (t.column && known.has(t.column) ? [[t.column, t.url]] : []))),
+        }));
+        if (result.newColumns.length) toast(`Skipped columns that aren't in this layout: ${result.newColumns.map(e => e.label).join(', ')}`, 'error');
+      }
+      if (!this.rows.length) this.rows = blankRows();
       this.pasting = false;
     } catch (err) {
       toast(`Couldn't read that — ${(err as Error).message}`, 'error');
@@ -149,8 +188,13 @@ export class SetupGuide extends LitElement {
 
   #build(): LaunchpadConfig {
     const next = structuredClone(config.raw);
+    const columns = this.#columns;
     next.site.title = this.pageTitle.trim();
-    next.environments = structuredClone(this.#envs);
+    // the heading follows the layout, unless it's been given a name of its own
+    if (['Projects', 'Applications'].includes(next.site.heading)) next.site.heading = columns.length ? 'Applications' : 'Projects';
+    // "just links" turns columns off but keeps any that were set up, with their tiles
+    next.useColumns = columns.length > 0;
+    if (columns.length) next.columns = structuredClone(columns);
     next.statusChecks = this.checks;
     next.widgets.clock.zones[0] = {
       label: this.timeZone === LOCAL_TIME_ZONE ? 'Local time' : cityOf(this.timeZone),
@@ -158,22 +202,38 @@ export class SetupGuide extends LitElement {
     };
     if (next.widgets.greeting.subtitle === STARTER.widgets.greeting.subtitle) next.widgets.greeting.subtitle = 'Where to today?';
 
-    const ids = new Set(next.apps.map(a => a.id));
-    for (const row of this.#named) {
-      let id = slug(row.name), n = 2;
-      while (ids.has(id)) id = `${slug(row.name)}-${n++}`;
+    const ids = new Set(next.cards.map(c => c.id));
+    const newCard = (name: string): CardConfig => {
+      let id = slug(name, 'card'), n = 2;
+      while (ids.has(id)) id = `${slug(name, 'card')}-${n++}`;
       ids.add(id);
-      next.apps.push({
-        id,
-        name: row.name.trim(),
-        links: [],
-        envs: this.#envs.flatMap(e => (row.urls[e.id]?.trim() ? [{ env: e.id, url: row.urls[e.id].trim() }] : [])),
+      const card: CardConfig = { id, name, links: [], tiles: [] };
+      next.cards.push(card);
+      return card;
+    };
+
+    if (columns.length) {
+      for (const row of this.#filled) {
+        newCard(row.name.trim()).tiles = columns.flatMap(e => (row.urls[e.id]?.trim() ? [{ column: e.id, url: row.urls[e.id].trim() }] : []));
+      }
+    } else {
+      // links with the same category share a card — an existing one, if the name matches
+      const categories = this.#categories();
+      this.rows.forEach((row, i) => {
+        if (!row.url.trim()) return;
+        const name = categories[i];
+        const card = next.cards.find(c => c.name.toLowerCase() === name.toLowerCase()) ?? newCard(name);
+        card.tiles.push({ name: row.name.trim(), url: row.url.trim(), ...(row.tag ? { label: row.tag } : {}) });
       });
     }
     return normalize(next);
   }
 
   #finish = async (toFile: boolean) => {
+    // a preset replaces the columns, and tiles in any it doesn't have go with them
+    const keep = new Set(this.#columns.map(e => e.id));
+    const lost = this.#links ? 0 : config.raw.cards.reduce((n, c) => n + c.tiles.filter(t => t.column && !keep.has(t.column)).length, 0);
+    if (lost && !confirm(`${plural(lost, 'tile')} on your existing cards ${lost === 1 ? 'is' : 'are'} in columns this layout doesn't have, and will be removed. Continue?`)) return;
     const next = this.#build();
     this.busy = true;
     try {
@@ -203,7 +263,7 @@ export class SetupGuide extends LitElement {
       <h3 class="setup-question">What should your page be called?</h3>
       <label class="field">
         <span class="field-label">Page title</span>
-        <input class="input input-lg" placeholder="e.g. Team Launchpad" .value=${this.pageTitle} data-field="setup:title"
+        <input class="input input-lg" placeholder="e.g. Home, Team Launchpad" .value=${this.pageTitle} data-field="setup:title"
                @input=${(e: Event) => (this.pageTitle = this.#input(e))}
                @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.#next()}>
       </label>
@@ -214,74 +274,151 @@ export class SetupGuide extends LitElement {
         <span class="field-hint">For the clock and the greeting. You can add more clocks later.</span>
       </label>
       <datalist id="setup-tz">${TIME_ZONES.map(tz => html`<option value=${tz}></option>`)}</datalist>
+      <div class="setup-examples">
+        <span class="field-label">Or start from an example, and make it yours in Settings</span>
+        <div class="example-cards">
+          ${EXAMPLES.map(x => html`
+            <button class="example-card" type="button" @click=${() => this.#useExample(x)}>
+              ${icon(x.glyph)}
+              <span><strong>${x.name}</strong><span class="field-hint">${x.description}</span></span>
+            </button>`)}
+        </div>
+      </div>
     `;
   }
 
-  #envStep() {
+  #useExample(example: Example) {
+    const what = `the ${example.name.toLowerCase()} example`;
+    if (config.raw.cards.length && !confirm(`Replace what's on your page with ${what}?`)) return;
+    this.#dialog.close();
+    transition(() => config.save(example.config()));
+    toast(`Loaded ${what}. Make it yours in Settings (Ctrl + ,), then Save to file`);
+  }
+
+  #layoutStep() {
+    const tags = ['WEB', 'REPO', 'DOCS'];
     return html`
-      <h3 class="setup-question">Which environments do your apps run in?</h3>
-      <p class="settings-hint">They become the columns on the page. You can rename, recolor or add more later.</p>
-      <div class="preset-cards" role="radiogroup" aria-label="Environments">
-        ${ENV_PRESETS.map((p, i) => html`
+      <h3 class="setup-question">What goes on it?</h3>
+      <p class="settings-hint">Projects, sites and bookmarks sorted into cards — or apps that each run in a few environments,
+        lined up in columns. You can change this later.</p>
+      <div class="preset-cards" role="radiogroup" aria-label="Layout">
+        <label class="preset-card">
+          <input type="radio" name="setup-preset" .checked=${this.#links} @change=${() => (this.preset = JUST_LINKS)}>
+          <span class="preset-pills">
+            ${tags.map((t, i) => html`<span class="env-pill sm" data-env style="--env:${cardColor(i)}">${t}</span>`)}
+          </span>
+          <span class="preset-name">Just links — projects, sites, bookmarks</span>
+        </label>
+        ${COLUMN_PRESETS.map((p, i) => html`
           <label class="preset-card">
             <input type="radio" name="setup-preset" .checked=${this.preset === i} @change=${() => (this.preset = i)}>
             <span class="preset-pills">
-              ${p.environments.map(e => html`<span class="env-pill sm" data-env style="--env:${e.color}">${e.label}</span>`)}
+              ${p.columns.map(e => html`<span class="env-pill sm" data-env style="--env:${e.color}">${e.label}</span>`)}
             </span>
-            <span class="preset-name">${p.name}</span>
+            <span class="preset-name">Apps in ${p.name}</span>
           </label>`)}
       </div>
       <label class="switch-label">
         <input class="switch" type="checkbox" .checked=${this.checks}
                @change=${(e: Event) => (this.checks = (e.target as HTMLInputElement).checked)}>
-        Show whether each environment is reachable
+        Show whether each link is reachable
       </label>
       <p class="field-hint">Opened straight from a file, your browser may ask permission to reach your local network for this.
         You can change it later in Settings.</p>
     `;
   }
 
-  #appsStep() {
-    const envs = this.#envs;
-    if (this.pasting) {
-      return html`
-        <h3 class="setup-question">Paste your applications</h3>
-        <p class="settings-hint">From a spreadsheet or CSV, with a <code>name</code> column and one column per environment
-          (${envs.map(e => html`<code>${e.label}</code> `)}).</p>
-        <textarea class="input csv-input" rows="8" spellcheck="false" aria-label="Applications to paste"
-                  placeholder=${`name,${envs.map(e => e.label).join(',')}\nBilling,https://…`}
-                  .value=${this.pasted} @input=${(e: Event) => (this.pasted = (e.target as HTMLTextAreaElement).value)}></textarea>
-        <div class="section-actions">
-          <button class="btn btn-soft btn-sm" type="button" @click=${() => this.#usePasted()}>${icon(Check)} Use these</button>
-          <button class="btn btn-ghost btn-sm" type="button" @click=${() => (this.pasting = false)}>Type them in instead</button>
-        </div>
-      `;
-    }
+  #pasteStep() {
+    const columns = this.#columns;
     return html`
-      <h3 class="setup-question">Add a few applications</h3>
-      <p class="settings-hint">A name and whichever addresses you have — leave the rest blank. Links, groups and descriptions can come later.</p>
-      <div class="setup-table-wrap">
-        <div class="setup-table" style="--cols:${envs.length}">
-          <div class="setup-row setup-head">
-            <span class="field-label">Name</span>
-            ${envs.map(e => html`<span class="env-pill sm" data-env style="--env:${e.color}">${e.label}</span>`)}
-            <span></span>
-          </div>
-          ${this.rows.map((row, i) => html`
-            <div class="setup-row">
-              <input class="input" aria-label="Application name" placeholder="e.g. Billing" .value=${row.name}
-                     data-field="setup:${i}:name" @input=${(e: Event) => { row.name = this.#input(e); this.requestUpdate(); }}>
-              ${envs.map(e => html`
-                <input class="input mono" type="url" aria-label="${row.name || 'Application'} ${e.label} address" placeholder="https://…"
-                       .value=${row.urls[e.id] ?? ''} data-field="setup:${i}:${e.id}"
-                       @input=${(ev: Event) => { row.urls[e.id] = this.#input(ev); this.requestUpdate(); }}>`)}
-              <button class="icon-btn xs danger" type="button" aria-label="Remove row" title="Remove" ?disabled=${this.rows.length === 1}
-                      @click=${() => { this.rows = this.rows.filter(r => r !== row); }}>${icon(Trash)}</button>
-            </div>`)}
-        </div>
-      </div>
+      <h3 class="setup-question">Paste from a spreadsheet</h3>
+      ${this.#links
+        ? html`<p class="settings-hint">One row per link, with <code>category</code>, <code>name</code> and <code>url</code>
+            columns (and <code>tag</code>, if you like).</p>`
+        : html`<p class="settings-hint">A <code>name</code> column and one column per environment
+            (${columns.map(e => html`<code>${e.label}</code> `)}).</p>`}
+      <textarea class="input csv-input" rows="8" spellcheck="false" aria-label="Rows to paste"
+                placeholder=${this.#links
+                  ? 'category,name,url,tag\nSide projects,Recipe box,https://…,WEB\nReading,A good blog,https://…'
+                  : `name,${columns.map(e => e.label).join(',')}\nBilling,https://…`}
+                .value=${this.pasted} @input=${(e: Event) => (this.pasted = (e.target as HTMLTextAreaElement).value)}></textarea>
       <div class="section-actions">
-        <button class="btn btn-ghost btn-sm" type="button" @click=${() => (this.rows = [...this.rows, { name: '', urls: {} }])}>
+        <button class="btn btn-soft btn-sm" type="button" @click=${() => this.#usePasted()}>${icon(Check)} Use these</button>
+        <button class="btn btn-ghost btn-sm" type="button" @click=${() => (this.pasting = false)}>Type them in instead</button>
+      </div>
+    `;
+  }
+
+  #removeButton(row: Row) {
+    return html`
+      <button class="icon-btn xs danger" type="button" aria-label="Remove row" title="Remove" ?disabled=${this.rows.length === 1}
+              @click=${() => { this.rows = this.rows.filter(r => r !== row); }}>${icon(Trash)}</button>`;
+  }
+
+  #linkTable() {
+    const categories = this.#categories();
+    const named = [...new Set(this.rows.map(r => r.category.trim()).filter(Boolean))];
+    return html`
+      <div class="setup-table links">
+        <div class="setup-row setup-head">
+          <span class="field-label">Category</span>
+          <span class="field-label">Name</span>
+          <span class="field-label">Address</span>
+          <span></span>
+        </div>
+        ${this.rows.map((row, i) => html`
+          <div class="setup-row">
+            <input class="input" aria-label="Category" list="setup-categories" .value=${row.category}
+                   placeholder=${i ? categories[i - 1] : 'e.g. Side projects'}
+                   @input=${(e: Event) => { row.category = this.#input(e); this.requestUpdate(); }}>
+            <input class="input" aria-label="Link name" placeholder="e.g. Recipe box" .value=${row.name}
+                   @input=${(e: Event) => { row.name = this.#input(e); this.requestUpdate(); }}>
+            <input class="input mono" type="url" aria-label="${row.name || 'Link'} address" placeholder="https://…"
+                   .value=${row.url} data-field="setup:${i}:url"
+                   @input=${(e: Event) => { row.url = this.#input(e); this.requestUpdate(); }}>
+            ${this.#removeButton(row)}
+          </div>`)}
+      </div>
+      <datalist id="setup-categories">${named.map(c => html`<option value=${c}></option>`)}</datalist>
+    `;
+  }
+
+  #envTable() {
+    const columns = this.#columns;
+    return html`
+      <div class="setup-table" style="--cols:${columns.length}">
+        <div class="setup-row setup-head">
+          <span class="field-label">Name</span>
+          ${columns.map(e => html`<span class="env-pill sm" data-env style="--env:${e.color}">${e.label}</span>`)}
+          <span></span>
+        </div>
+        ${this.rows.map((row, i) => html`
+          <div class="setup-row">
+            <input class="input" aria-label="App name" placeholder="e.g. Billing" .value=${row.name}
+                   data-field="setup:${i}:name" @input=${(e: Event) => { row.name = this.#input(e); this.requestUpdate(); }}>
+            ${columns.map(e => html`
+              <input class="input mono" type="url" aria-label="${row.name || 'App'} ${e.label} address" placeholder="https://…"
+                     .value=${row.urls[e.id] ?? ''} data-field="setup:${i}:${e.id}"
+                     @input=${(ev: Event) => { row.urls[e.id] = this.#input(ev); this.requestUpdate(); }}>`)}
+            ${this.#removeButton(row)}
+          </div>`)}
+      </div>
+    `;
+  }
+
+  #cardsStep() {
+    if (this.pasting) return this.#pasteStep();
+    return html`
+      ${this.#links ? html`
+        <h3 class="setup-question">Add a few links</h3>
+        <p class="settings-hint">Links with the same category share a card — leave it blank to use the one above.
+          Tags, colors and groups can come later.</p>` : html`
+        <h3 class="setup-question">Add a few apps</h3>
+        <p class="settings-hint">Each one is a card: a name and whichever addresses you have — leave the rest blank.
+          Links, groups and descriptions can come later.</p>`}
+      <div class="setup-table-wrap">${this.#links ? this.#linkTable() : this.#envTable()}</div>
+      <div class="section-actions">
+        <button class="btn btn-ghost btn-sm" type="button" @click=${() => (this.rows = [...this.rows, blankRow()])}>
           ${icon(Plus)} Add another
         </button>
         <button class="btn btn-ghost btn-sm" type="button" @click=${() => (this.pasting = true)}>
@@ -292,14 +429,20 @@ export class SetupGuide extends LitElement {
   }
 
   #saveStep() {
-    const n = this.#named.length;
+    const n = this.#filled.length;
+    const cards = this.#links
+      ? new Set(this.#categories().filter((_, i) => this.rows[i].url.trim()).map(c => c.toLowerCase())).size
+      : n;
+    const what = !n ? 'Nothing added yet — add cards any time in Settings'
+      : this.#links ? `${plural(n, 'link')} in ${plural(cards, 'card')}`
+      : plural(n, 'app');
     return html`
       <h3 class="setup-question">All set?</h3>
       <ul class="setup-summary">
         <li>${icon(Check)} <span><strong>${this.pageTitle}</strong>, on ${cityOf(this.timeZone)} time</span></li>
-        <li>${icon(Check)} <span>${this.#envs.map(e => html`<span class="env-pill sm" data-env style="--env:${e.color}">${e.label}</span>`)}
+        <li>${icon(Check)} <span>${this.#links ? 'Just links' : this.#columns.map(e => html`<span class="env-pill sm" data-env style="--env:${e.color}">${e.label}</span>`)},
           ${this.checks ? 'with status checks' : 'without status checks'}</span></li>
-        <li>${icon(Check)} <span>${n ? `${n} application${n === 1 ? '' : 's'}` : 'No applications yet — add them any time in Settings'}</span></li>
+        <li>${icon(Check)} <span>${what}</span></li>
       </ul>
       <p class="settings-hint">
         ${canWriteDirectly
@@ -312,7 +455,7 @@ export class SetupGuide extends LitElement {
 
   render() {
     const last = this.step === STEPS.length - 1;
-    const body = [() => this.#nameStep(), () => this.#envStep(), () => this.#appsStep(), () => this.#saveStep()][this.step];
+    const body = [() => this.#nameStep(), () => this.#layoutStep(), () => this.#cardsStep(), () => this.#saveStep()][this.step];
     return html`
       <dialog class="settings setup" aria-labelledby="setup-title"
               @cancel=${this.#onCancel} @pointerdown=${this.#onPointerDown} @click=${this.#onClick}>
@@ -342,7 +485,7 @@ export class SetupGuide extends LitElement {
                   ${icon(Save)} Save to file
                 </button>` : html`
                 <button class="btn btn-primary" type="button" @click=${this.#next}>
-                  ${this.step === 2 && !this.#named.length && !this.pasting ? 'Skip for now' : 'Next'} ${icon(ArrowRight)}
+                  ${this.step === 2 && !this.#filled.length && !this.pasting ? 'Skip for now' : 'Next'} ${icon(ArrowRight)}
                 </button>`}
             </div>
           </footer>

@@ -1,15 +1,14 @@
 // src/components/page-backdrop.ts
-// Fixed full-page atmosphere: drifting color blobs, a particle constellation and film grain.
-// The cursor carries a soft glow, pushes nearby particles aside, links to them, and — in the
-// Classic palette, where particles are otherwise kept to the margins — reveals them around it.
+// Fixed full-page atmosphere: the style's backdrop (blobs of colour, or its pattern), a soft glow that
+// follows the pointer, film grain, and a canvas for the background in use — the built-in particles
+// (backgrounds/particles.ts) or one an extension adds (lib/extensions.ts). This runs its frames, sizes its
+// canvas and tells it the colours, so a background only has to draw.
+// The "still" background leaves the canvas out, and "plain" everything but the base colour.
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
-
-type Particle = { x: number; y: number; vx: number; vy: number; r: number };
-
-const LINK_DIST = 130;     // px — particles closer than this get joined by a line
-const POINTER_DIST = 240;  // px — particles closer than this to the cursor reach for it
-const REPEL_DIST = 140;    // px — particles closer than this drift away from the cursor
+import '../backgrounds/particles.js';
+import { registry, type BackgroundType, type Colors } from '../lib/extensions.js';
+import { look } from '../lib/look.js';
 
 @customElement('page-backdrop')
 export class PageBackdrop extends LitElement {
@@ -18,17 +17,18 @@ export class PageBackdrop extends LitElement {
   #backdrop?: HTMLElement;
   #canvas?: HTMLCanvasElement;
   #ctx?: CanvasRenderingContext2D;
-  #parts: Particle[] = [];
+  /** The background being drawn, if any. */
+  #bg?: BackgroundType;
+  #colors: Colors = { particle: 'gray', accent: 'gray', accent2: 'gray', accent3: 'gray', ink: 'black', muted: 'gray', bg: 'white' };
   #w = 0;
   #h = 0;
-  #pointer = { x: -1e4, y: -1e4 };
-  #pointerRaf = 0;
-  #color = 'gray';
-  #raf = 0;
-  #last = 0;
   #dpr = 1;
-  #reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  #themeObserver = new MutationObserver(() => this.#readColor());
+  #pointer: { x: number; y: number } | null = null;
+  #pointerRaf = 0;
+  #raf = 0;
+  #start = 0;
+  #last = 0;
+  #shown = '';
   // the canvas' own size, so window resizes, zoom and side panels opening are all caught
   #sizeObserver = new ResizeObserver(() => this.#resize());
 
@@ -37,14 +37,12 @@ export class PageBackdrop extends LitElement {
     this.#canvas = this.querySelector('canvas') ?? undefined;
     this.#ctx = this.#canvas?.getContext('2d') ?? undefined;
     if (!this.#ctx) return;
-    this.#readColor();
-    this.#resize();
     this.#sizeObserver.observe(this.#canvas!);
     addEventListener('pointermove', this.#onPointer, { passive: true });
     addEventListener('pointerout', this.#onPointerOut);
-    this.#themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-palette'] });
-    this.#reduceMotion.addEventListener('change', this.#restart);
-    this.#restart();
+    look.addEventListener('change', this.#onLook);
+    registry.addEventListener('change', this.#onLook);
+    this.#onLook();
   }
 
   disconnectedCallback() {
@@ -54,16 +52,37 @@ export class PageBackdrop extends LitElement {
     this.#sizeObserver.disconnect();
     removeEventListener('pointermove', this.#onPointer);
     removeEventListener('pointerout', this.#onPointerOut);
-    this.#themeObserver.disconnect();
-    this.#reduceMotion.removeEventListener('change', this.#restart);
+    look.removeEventListener('change', this.#onLook);
+    registry.removeEventListener('change', this.#onLook);
   }
 
-  // the canvas' CSS `color` is set to var(--particle), so this picks up theme changes
-  #readColor() {
-    if (!this.#canvas) return;
-    this.#color = getComputedStyle(this.#canvas).color;
-    if (this.#reduceMotion.matches) this.#draw();
+  /** The background chosen — falling back to the particles while (or if) an extension's isn't there. */
+  #chosen() {
+    const id = look.background;
+    if (id === 'still' || id === 'plain') return undefined;
+    return registry.backgrounds.get(id) ?? registry.backgrounds.get('particles');
   }
+
+  #onLook = () => {
+    if (!this.#canvas) return;
+    const bg = this.#chosen();
+    const shown = [look.theme, look.style, look.reducedMotion, bg?.name].join();
+    if (shown === this.#shown && bg === this.#bg) return;
+    this.#shown = shown;
+    if (bg !== this.#bg) {
+      this.#bg = bg;
+      this.#start = performance.now();
+      this.#safely(() => bg?.setup?.({ width: this.#w, height: this.#h }));
+    }
+    // the canvas' CSS `color` is var(--particle); the rest are read off it as they stand in this style and theme
+    const cs = getComputedStyle(this.#canvas);
+    const v = (name: string) => cs.getPropertyValue(name).trim();
+    this.#colors = {
+      particle: cs.color, accent: v('--accent'), accent2: v('--accent-2'), accent3: v('--accent-3'),
+      ink: v('--ink'), muted: v('--muted'), bg: v('--bg'),
+    };
+    this.#restart();
+  };
 
   #onPointer = (e: PointerEvent) => {
     this.#pointer = { x: e.clientX, y: e.clientY };
@@ -71,127 +90,74 @@ export class PageBackdrop extends LitElement {
     this.#pointerRaf ||= requestAnimationFrame(() => {
       this.#pointerRaf = 0;
       const b = this.#backdrop;
-      if (!b) return;
+      if (!b || !this.#pointer) return;
       b.style.setProperty('--cx', `${this.#pointer.x}px`);
       b.style.setProperty('--cy', `${this.#pointer.y}px`);
       b.toggleAttribute('data-pointer', true);
-      if (this.#reduceMotion.matches) this.#draw();
+      if (look.reducedMotion) this.#draw(0);
     });
   };
 
   // relatedTarget is null when the pointer leaves the window
   #onPointerOut = (e: PointerEvent) => {
     if (e.relatedTarget) return;
-    this.#pointer = { x: -1e4, y: -1e4 };
+    this.#pointer = null;
     this.#backdrop?.removeAttribute('data-pointer');
   };
-
-  #spawn(): Particle {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 0.12 + Math.random() * 0.22;
-    return {
-      x: Math.random() * this.#w, y: Math.random() * this.#h,
-      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      r: 0.8 + Math.random() * 1.6,
-    };
-  }
 
   #resize() {
     const canvas = this.#canvas!, ctx = this.#ctx!;
     const dpr = Math.min(devicePixelRatio || 1, 2);
-    const w = canvas.clientWidth || innerWidth;
-    const h = canvas.clientHeight || innerHeight;
-    // stretch the constellation to the new size, rather than leaving particles stranded
-    // where the old edges were (they'd bunch up against the sides as they wrap back in)
-    if (this.#w && this.#h) {
-      for (const p of this.#parts) {
-        p.x *= w / this.#w;
-        p.y *= h / this.#h;
-      }
-    }
-    this.#w = w;
-    this.#h = h;
+    this.#w = canvas.clientWidth || innerWidth;
+    this.#h = canvas.clientHeight || innerHeight;
     this.#dpr = dpr;
     canvas.width = Math.round(this.#w * dpr);
     canvas.height = Math.round(this.#h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const target = Math.round(Math.min(110, (this.#w * this.#h) / 14_000));
-    while (this.#parts.length < target) this.#parts.push(this.#spawn());
-    this.#parts.length = target;
-    this.#draw();
+    this.#safely(() => this.#bg?.setup?.({ width: this.#w, height: this.#h }));
+    this.#draw(0);
   }
 
-  #restart = () => {
+  #restart() {
     cancelAnimationFrame(this.#raf);
-    if (this.#reduceMotion.matches) return this.#draw();
+    this.#draw(0);
+    if (!this.#bg || look.reducedMotion) return;
     this.#last = performance.now();
     this.#raf = requestAnimationFrame(this.#frame);
-  };
+  }
 
   #frame = (now: number) => {
     // dragged to a screen with different scaling: same CSS size, so no resize event
     if (Math.min(devicePixelRatio || 1, 2) !== this.#dpr) this.#resize();
     const dt = Math.min((now - this.#last) / 16.67, 3); // frame-rate independent movement
     this.#last = now;
-    const { x: px, y: py } = this.#pointer;
-    for (const p of this.#parts) {
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      // drift away from the cursor, so it clears a little space as it moves
-      const dx = p.x - px, dy = p.y - py, d = Math.hypot(dx, dy);
-      if (d < REPEL_DIST && d > 0.5) {
-        const push = (1 - d / REPEL_DIST) * 1.8 * dt;
-        p.x += (dx / d) * push;
-        p.y += (dy / d) * push;
-      }
-      // wrap around the edges
-      if (p.x < -10) p.x = this.#w + 10; else if (p.x > this.#w + 10) p.x = -10;
-      if (p.y < -10) p.y = this.#h + 10; else if (p.y > this.#h + 10) p.y = -10;
-    }
-    this.#draw();
-    this.#raf = requestAnimationFrame(this.#frame);
+    this.#draw(dt);
+    if (this.#bg) this.#raf = requestAnimationFrame(this.#frame);
   };
 
-  #draw() {
-    const ctx = this.#ctx, parts = this.#parts;
+  #draw(dt: number) {
+    const ctx = this.#ctx;
     if (!ctx) return;
     ctx.clearRect(0, 0, this.#w, this.#h);
-    ctx.strokeStyle = ctx.fillStyle = this.#color;
-    const { x: px, y: py } = this.#pointer;
-
-    for (let i = 0; i < parts.length; i++) {
-      const a = parts[i];
-      ctx.lineWidth = 1;
-      for (let j = i + 1; j < parts.length; j++) {
-        const b = parts[j];
-        const d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (d < LINK_DIST) this.#line(a.x, a.y, b.x, b.y, (1 - d / LINK_DIST) * 0.2);
-      }
-      const dp = Math.hypot(a.x - px, a.y - py);
-      if (dp < POINTER_DIST) {
-        ctx.lineWidth = 1.25;
-        this.#line(a.x, a.y, px, py, (1 - dp / POINTER_DIST) * 0.6);
-      }
-    }
-
-    // dots near the cursor glow brighter and a little bigger
-    for (const p of parts) {
-      const near = Math.max(0, 1 - Math.hypot(p.x - px, p.y - py) / POINTER_DIST);
-      ctx.globalAlpha = 0.5 + near * 0.45;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r * (1 + near * 0.8), 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
+    const bg = this.#bg;
+    if (!bg) return;
+    ctx.save();
+    this.#safely(() => bg.draw(ctx, {
+      width: this.#w, height: this.#h, time: performance.now() - this.#start, dt,
+      pointer: this.#pointer, colors: this.#colors, still: look.reducedMotion,
+    }));
+    ctx.restore();
   }
 
-  #line(x1: number, y1: number, x2: number, y2: number, alpha: number) {
-    const ctx = this.#ctx!;
-    ctx.globalAlpha = alpha;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
+  /** A background that throws stops drawing, rather than throwing every frame. */
+  #safely(run: () => void) {
+    try {
+      run();
+    } catch (err) {
+      console.error(`Launchpad: the "${this.#bg?.name}" background stopped —`, err);
+      this.#bg = undefined;
+      cancelAnimationFrame(this.#raf);
+    }
   }
 
   render() {

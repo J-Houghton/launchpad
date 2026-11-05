@@ -1,46 +1,57 @@
 // src/components/settings-panel.ts
 // Settings, in two modes:
-//   My view   — just for you: appearance, which apps show, pins + history. Applies instantly, saved in this browser.
-//   Edit page — the page itself: apps, environments, links, widgets, branding. A draft until saved;
-//               "Save to file" writes launchpad.config.js (see lib/config-file.ts), "Save" keeps it in this browser.
+//   My view   — just for you: your look, which cards show, pins + history. Applies instantly, saved in this browser.
+//               "Make it everyone's" copies your look into the page.
+//   Edit page — the page itself, in four tabs: Cards (and their columns), Layout, Widgets, and Page (title, header
+//               links, status checks, custom CSS). A draft until saved; "Save to file" writes launchpad.config.js
+//               (see lib/config-file.ts), "Save" keeps it in this browser. The File menu opens, downloads and loads examples.
 // Open it with the faint gear in the footer, or Ctrl+, (⌘+, on a Mac).
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import {
-  ENV_PRESETS, LINK_ICONS, cityOf, config, isHttpUrl, validTimeZone,
-  type AppConfig, type AppEnv, type EnvDef, type LaunchpadConfig, type LinkIcon, type LinkItem,
+  COLUMN_PRESETS, LINK_ICONS, NEW_COLUMN_COLORS, STYLES, cardColor, cardHue, cityOf, config, hostOf, isHttpUrl, validTimeZone,
+  MAX_CSS, MAX_TEMPLATE, SECTION_IDS, isExtensionPath, sectionName, type AddedWidget, type Background, type CardConfig,
+  type DataWidget, type ExtensionWidget, type ColumnDef, type Density, type LaunchpadConfig, type LinkIcon,
+  type LinkItem, type SectionId, type Style, type ThemeMode, type TileConfig,
 } from '../config.js';
+import { arrange } from '../lib/arrange.js';
+import { EXAMPLES, type Example } from '../lib/examples.js';
+import { SPANS, moveCard, place, setNewRow, setSpan } from '../lib/layout.js';
+import { look, type Motion } from '../lib/look.js';
+import { previewCss, safeMode } from '../lib/custom-css.js';
+import { registry, widgetOptions, type Field } from '../lib/extensions.js';
+import { parseTemplate } from '../lib/template.js';
+import { fetchData, showData } from './added-widgets.js';
 import { dragToReorder, keyboardReorder, type SortMove } from '../lib/sortable.js';
-import { applyAppsImport, appsToCsv, csvTemplate, readAppsCsv, type AppsImport } from '../lib/csv.js';
+import { applyCardsImport, cardsToCsv, csvTemplate, readCardsCsv, type CardsImport } from '../lib/csv.js';
 import { openSetupGuide } from './setup-guide.js';
 import { prefs } from '../lib/prefs.js';
 import { StoreController } from '../lib/store-controller.js';
 import { transition } from '../lib/transition.js';
 import {
-  currentPalette, setPalette, setThemeMode, themeMode, type Palette, type ThemeMode,
-} from '../lib/theme.js';
-import {
   canWriteDirectly, download, forgetLinkedFile, linkedFileName, parseConfigText, toFileText, writeConfigFile,
 } from '../lib/config-file.js';
 import {
-  AppWindow, Check, ChevronDown, ClipboardPaste, Download, FileSpreadsheet, FolderOpen, FolderPlus, GripVertical,
-  Layers, Link2, MapPin, Monitor, Moon, Pencil, Plus, RotateCcw, Save, Search, SlidersHorizontal, Sparkles, Sun,
-  Trash, TriangleAlert, Type, Unlink, Upload, User, X, icon, type IconNode,
+  Activity, AppWindow, ArrowUpRight, Blend, Braces, Check, Coins, GitBranch, Newspaper, Puzzle, ChevronDown, ClipboardPaste, Code, Download, FileSpreadsheet, FolderOpen, FolderPlus, GripVertical,
+  Columns3, Layers, LayoutGrid, MapPin, Monitor, Moon, Palette as PaletteIcon, PanelTop, Pencil, Plus, RotateCcw,
+  Play, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Square, Sun, Trash, TriangleAlert, Unlink, Upload, User, Users, X, icon,
+  type IconNode,
 } from '../lib/icons.js';
 import { ago, initials, toast } from '../lib/util.js';
 
-type EditTab = 'apps' | 'environments' | 'links' | 'widgets' | 'branding';
+type EditTab = 'cards' | 'layout' | 'widgets' | 'page';
 export type SettingsTab = 'view' | EditTab;
-type Problem = { tab: EditTab; field: string; message: string; appId?: string };
+type Problem = { tab: EditTab; field: string; message: string };
 type Place = { name: string; admin1?: string; country?: string; latitude: number; longitude: number; timezone?: string };
+type Option<T> = { id: T; label: string; glyph?: IconNode; hint?: string };
+type MenuItem = { label: string; glyph: IconNode; run: () => void; hint?: string };
 
 const EDIT_TABS: { id: EditTab; label: string; glyph: IconNode }[] = [
-  { id: 'apps', label: 'Applications', glyph: AppWindow },
-  { id: 'environments', label: 'Environments', glyph: Layers },
-  { id: 'links', label: 'Header links', glyph: Link2 },
+  { id: 'cards', label: 'Cards', glyph: Layers },
+  { id: 'layout', label: 'Layout', glyph: LayoutGrid },
   { id: 'widgets', label: 'Widgets', glyph: SlidersHorizontal },
-  { id: 'branding', label: 'Branding', glyph: Type },
+  { id: 'page', label: 'Page', glyph: PanelTop },
 ];
 
 const ICON_LABELS: Record<LinkIcon, string> = {
@@ -48,28 +59,119 @@ const ICON_LABELS: Record<LinkIcon, string> = {
   ticket: 'Tickets', terminal: 'Console', database: 'Database', shield: 'Security', chat: 'Chat',
 };
 
-const PALETTES: { id: Palette; name: string; description: string; swatches: string[] }[] = [
-  {
-    id: 'aurora', name: 'Aurora', description: 'Soft purple, pink and gold glow with frosted glass. The default.',
-    swatches: ['oklch(0.48 0.2 300)', 'oklch(0.62 0.21 345)', 'oklch(0.66 0.15 245)', 'oklch(0.76 0.15 75)', 'oklch(0.7 0.11 185)'],
-  },
-  {
-    id: 'classic', name: 'Classic', description: 'Greys, purple and gold, with a striped border.',
-    swatches: ['hsl(266 55% 35%)', 'hsl(41.45 87.36% 65.88%)', '#0b95da', '#da950b', '#e61a5e'],
-  },
-];
+const STYLE_INFO: Record<Style, { name: string; description: string }> = {
+  aurora: { name: 'Aurora', description: 'A soft purple and pink glow, frosted glass, and a serif headline' },
+  classic: { name: 'Classic', description: 'Crisp white panels, purple and gold, with a striped border' },
+  blueprint: { name: 'Blueprint', description: 'Grid paper, square corners and monospaced type' },
+  paper: { name: 'Paper', description: 'Cream stock, inked outlines and serif headings, like a printed page' },
+  neon: { name: 'Neon', description: 'A glowing grid at night, with pink and cyan outlines' },
+  bold: { name: 'Bold', description: 'Chunky borders, hard shadows and bright tiles' },
+};
 
-const THEMES: { id: ThemeMode; label: string; glyph: IconNode }[] = [
-  { id: 'system', label: 'System', glyph: Monitor },
+/** The tiles in a style's preview, in the first three card colours. */
+const PREVIEW_TILES = [0, 1, 2].map(cardColor);
+
+const THEMES: Option<ThemeMode>[] = [
+  { id: 'system', label: 'System', glyph: Monitor, hint: 'Follow the device\'s setting' },
   { id: 'light', label: 'Light', glyph: Sun },
   { id: 'dark', label: 'Dark', glyph: Moon },
 ];
 
-const NEW_ENV_COLORS = ['#10b981', '#8b5cf6', '#f97316', '#64748b', '#0ea5e9', '#d946ef'];
+const BACKGROUNDS: Option<Background>[] = [
+  { id: 'particles', label: 'Particles', glyph: Sparkles, hint: 'The style\'s backdrop, with particles that drift and follow the pointer' },
+  { id: 'still', label: 'Still', glyph: Blend, hint: 'The style\'s backdrop, without the particles' },
+  { id: 'plain', label: 'Plain', glyph: Square, hint: 'A plain colour' },
+];
+
+const MOTIONS: Option<Motion>[] = [
+  { id: 'system', label: 'System', glyph: Monitor, hint: 'Follow the device\'s "reduce motion" setting' },
+  { id: 'full', label: 'Full' },
+  { id: 'reduced', label: 'Reduced', hint: 'No moving background, typing or sliding' },
+];
+
+const DENSITIES: Option<Density>[] = [
+  { id: 'comfortable', label: 'Comfortable', hint: 'Roomy tiles' },
+  { id: 'compact', label: 'Compact', hint: 'Shorter tiles, tighter spacing' },
+];
+
+/**
+ * Ready-made data widgets, from public APIs that let any page read them. Each fills in the address and a
+ * template to start from — handy as examples of templates, too.
+ */
+const DATA_PRESETS: { name: string; hint: string; glyph: IconNode; widget: Omit<DataWidget, 'id' | 'type'> }[] = [
+  {
+    name: 'A GitHub repository', glyph: GitBranch, hint: 'Stars, forks, issues and the last push. Change owner/repo in the address.',
+    widget: {
+      title: 'lit/lit on GitHub', url: 'https://api.github.com/repos/lit/lit', refresh: 60,
+      template: [
+        '<p><a href="{{html_url}}">{{full_name}}</a></p>',
+        '<p class="muted">{{description}}</p>',
+        '<ul class="data-list">',
+        '  <li><span>Stars</span> <b>{{stargazers_count | number}}</b></li>',
+        '  <li><span>Forks</span> <b>{{forks_count | number}}</b></li>',
+        '  <li><span>Open issues</span> <b>{{open_issues_count | number}}</b></li>',
+        '  <li><span>Last push</span> <b>{{pushed_at | ago}}</b></li>',
+        '</ul>',
+      ].join('\n'),
+    },
+  },
+  {
+    name: 'Hacker News front page', glyph: Newspaper, hint: 'The top five stories, through Algolia\'s API.',
+    widget: {
+      title: 'Hacker News', url: 'https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=5', refresh: 15,
+      template: [
+        '<ul class="data-list">{{#hits}}',
+        '  <li><a href="{{url}}">{{title}}</a> <small>{{points}} points · <a href="https://news.ycombinator.com/item?id={{objectID}}">{{num_comments}} comments</a></small></li>',
+        '{{/hits}}</ul>',
+      ].join('\n'),
+    },
+  },
+  {
+    name: 'Exchange rates', glyph: Coins, hint: 'A dollar in euros, pounds, yen and Canadian dollars, updated daily.',
+    widget: {
+      title: 'Exchange rates', url: 'https://open.er-api.com/v6/latest/USD', refresh: 60,
+      template: [
+        '<ul class="data-list">',
+        '  <li><span>1 {{base_code}} in euros</span> <b>€{{rates.EUR | number}}</b></li>',
+        '  <li><span>in pounds</span> <b>£{{rates.GBP | number}}</b></li>',
+        '  <li><span>in yen</span> <b>¥{{rates.JPY | number}}</b></li>',
+        '  <li><span>in Canadian dollars</span> <b>{{rates.CAD | number}}</b></li>',
+        '</ul>',
+        '<p><small>As of {{time_last_update_unix | date}}</small></p>',
+      ].join('\n'),
+    },
+  },
+  {
+    name: 'A service\'s status', glyph: Activity, hint: 'Any status page on Atlassian Statuspage — here, GitHub\'s. Swap the site in the address.',
+    widget: {
+      title: 'GitHub status', url: 'https://www.githubstatus.com/api/v2/summary.json', refresh: 5,
+      template: [
+        '<p><a href="{{page.url}}"><b>{{status.description}}</b></a></p>',
+        '<ul class="data-list">{{#incidents}}<li><a href="{{shortlink}}">{{name}}</a> <small>{{status}}</small></li>{{/incidents}}</ul>',
+        '{{^incidents}}<p class="muted">No open incidents · checked {{page.updated_at | ago}}</p>{{/incidents}}',
+      ].join('\n'),
+    },
+  },
+];
+
+/** The example extensions that come with Launchpad, in public/extensions/. */
+const BUNDLED_EXTENSIONS = [
+  { path: 'extensions/notes.js', name: 'Notes', description: 'A scratchpad widget, kept in this browser' },
+  { path: 'extensions/countdown.js', name: 'Countdown', description: 'A widget counting down the days to a date' },
+  { path: 'extensions/search.js', name: 'Search box', description: 'Search the web, or your own site — in place of the greeting, say' },
+  { path: 'extensions/starfield.js', name: 'Starfield', description: 'A background of stars streaming past' },
+];
+
+/** How often a data widget fetches its address again: [minutes, label]. */
+const REFRESHES: [number, string][] = [
+  [1, 'Every minute'], [5, 'Every 5 minutes'], [15, 'Every 15 minutes'], [60, 'Every hour'], [0, 'Only when the page opens'],
+];
+
+const nameOf = <T>(options: Option<T>[], id: T) => options.find(o => o.id === id)?.label ?? String(id);
+
 const TIME_ZONES = Intl.supportedValuesOf?.('timeZone') ?? [];
 
 const clone = <T>(value: T): T => structuredClone(value);
-const hueOf = (i: number) => (285 + i * 35) % 360;
 
 let instance: SettingsPanel | undefined;
 
@@ -82,7 +184,7 @@ export class SettingsPanel extends LitElement {
   protected createRenderRoot() { return this; }
 
   @state() private mode: 'view' | 'edit' = 'edit';
-  @state() private tab: EditTab = 'apps';
+  @state() private tab: EditTab = 'cards';
   @state() private draft: LaunchpadConfig = clone(config.raw);
   @state() private dirty = false;
   @state() private busy = false;
@@ -90,14 +192,18 @@ export class SettingsPanel extends LitElement {
   @state() private placeResults?: Place[];
   @state() private placeBusy = false;
   /** The CSV import panel, when open. */
-  @state() private csv?: { text: string; result?: AppsImport; error?: string; replace: boolean };
-  #openApp?: string;
+  @state() private csv?: { text: string; result?: CardsImport; error?: string; replace: boolean };
+  /** Data widgets tried out in Settings: what came back, by widget id. */
+  @state() private tries: Record<string, { busy?: boolean; data?: unknown; error?: string }> = {};
+  #openCard?: string;
   #placeQuery = '';
   #downOnBackdrop = false;
+  /** Whether custom CSS starts open (when there is some): set as the dialog opens, then left as you leave it. */
+  #advancedOpen = false;
 
   constructor() {
     super();
-    new StoreController(this, config, prefs);
+    new StoreController(this, config, prefs, look, registry);
   }
 
   connectedCallback() {
@@ -115,6 +221,7 @@ export class SettingsPanel extends LitElement {
   get #dialog() { return this.querySelector<HTMLDialogElement>('dialog.settings')!; }
 
   async show(tab?: SettingsTab) {
+    if (arrange.active) return toast('Finish arranging first — Save or Cancel at the bottom of the page');
     if (tab === 'view') this.mode = 'view';
     else if (tab) { this.mode = 'edit'; this.tab = tab; }
     if (this.#dialog.open) return;
@@ -122,10 +229,26 @@ export class SettingsPanel extends LitElement {
     this.dirty = false;
     this.placeResults = undefined;
     this.csv = undefined;
-    this.#openApp = undefined;
+    this.tries = {};
+    this.#openCard = undefined;
+    this.#advancedOpen = !!config.look.css;
     this.linkedFile = await linkedFileName();
     await this.updateComplete;
     this.#dialog.showModal();
+    this.#previewCss();
+  }
+
+  updated(changed: Map<string, unknown>) {
+    // a new tab, or the other mode, starts at the top
+    if (changed.has('tab') || changed.has('mode')) this.querySelector('.settings-body')?.scrollTo(0, 0);
+    this.#previewCss();
+    this.#fillPreviews();
+  }
+
+  /** While the Page tab is open, the page behind shows the custom CSS being edited. */
+  #previewCss() {
+    const open = this.#dialog?.open && this.mode === 'edit' && this.tab === 'page';
+    previewCss(open ? this.draft.look.css : undefined);
   }
 
   #onShortcut = (e: KeyboardEvent) => {
@@ -193,30 +316,32 @@ export class SettingsPanel extends LitElement {
     list.splice(to, 0, item);
   }
 
-  /** List ids: "envs", "groups", "links", "zones", "applinks:<app id>", "apps:<group id>" ('' = no group). */
+  /**
+   * List ids: "columns", "groups", "links", "zones", "sections", "cardlinks:<card id>", "tiles:<card id>" (the tiles
+   * it lists), and "cards:<group id>" ('' = no group).
+   */
   #applyMove({ from, to }: SortMove) {
     const d = this.draft;
     this.#edit(() => {
-      if (from.list.startsWith('apps:')) {
-        const appsIn = (group: string) => d.apps.filter(a => (a.group ?? '') === group);
-        const app = appsIn(from.list.slice(5))[from.index];
-        if (!app) return;
-        d.apps.splice(d.apps.indexOf(app), 1);
-        const group = to.list.slice(5);
-        if (group) app.group = group; else delete app.group;
-        // only the order within a group matters, so place it relative to that group's apps
-        const peers = appsIn(group);
-        const before = peers[to.index];
-        if (before) d.apps.splice(d.apps.indexOf(before), 0, app);
-        else if (peers.length) d.apps.splice(d.apps.indexOf(peers[peers.length - 1]) + 1, 0, app);
-        else d.apps.push(app);
+      if (from.list.startsWith('cards:')) {
+        return moveCard(d, { group: from.list.slice(6), index: from.index }, { group: to.list.slice(6), index: to.index });
+      }
+      if (from.list.startsWith('tiles:')) {
+        const card = d.cards.find(c => c.id === from.list.slice(6));
+        if (!card) return;
+        if (!d.useColumns) return this.#reorder(card.tiles, from.index, to.index);
+        // with columns on, only the tiles outside them are listed; the rest keep to their columns
+        const others = card.tiles.filter(t => !t.column);
+        this.#reorder(others, from.index, to.index);
+        card.tiles = [...card.tiles.filter(t => t.column), ...others];
         return;
       }
       const lists: Record<string, unknown[] | undefined> = {
-        envs: d.environments, groups: d.groups, links: d.links, zones: d.widgets.clock.zones,
+        columns: d.columns, groups: d.groups, links: d.links, zones: d.widgets.clock.zones, sections: d.layout.sections,
+        extensions: d.extensions,
       };
-      const list = from.list.startsWith('applinks:')
-        ? d.apps.find(a => a.id === from.list.slice(9))?.links
+      const list = from.list.startsWith('cardlinks:')
+        ? d.cards.find(c => c.id === from.list.slice(10))?.links
         : lists[from.list];
       if (list) this.#reorder(list, from.index, to.index);
     });
@@ -247,28 +372,33 @@ export class SettingsPanel extends LitElement {
   #firstProblem(): Problem | undefined {
     const d = this.draft;
     const blank = (s: string | undefined) => !s?.trim();
-    if (blank(d.site.title)) return { tab: 'branding', field: 'site:title', message: 'Give the page a title.' };
-    for (const [i, env] of d.environments.entries()) {
-      if (blank(env.label)) return { tab: 'environments', field: `envdef:${i}:label`, message: 'Give this environment a name.' };
+    if (blank(d.site.title)) return { tab: 'page', field: 'site:title', message: 'Give the page a title.' };
+    for (const [i, column] of d.columns.entries()) {
+      if (d.useColumns && blank(column.label)) return { tab: 'cards', field: `coldef:${i}:label`, message: 'Give this column a name.' };
     }
     for (const [i, link] of d.links.entries()) {
-      if (blank(link.label)) return { tab: 'links', field: `link:${i}:label`, message: 'Give this link a label.' };
-      if (blank(link.url)) return { tab: 'links', field: `link:${i}:url`, message: 'Add an address for this link.' };
+      if (blank(link.label)) return { tab: 'page', field: `link:${i}:label`, message: 'Give this link a label.' };
+      if (blank(link.url)) return { tab: 'page', field: `link:${i}:url`, message: 'Add an address for this link.' };
     }
     for (const group of d.groups) {
-      if (blank(group.name)) return { tab: 'apps', field: `group:${group.id}:name`, message: 'Give this group a name.' };
+      if (blank(group.name)) return { tab: 'cards', field: `group:${group.id}:name`, message: 'Give this group a name.' };
     }
-    for (const app of d.apps) {
-      const at = { tab: 'apps' as const, appId: app.id };
-      if (blank(app.name)) return { ...at, field: `app:${app.id}:name`, message: 'Give this application a name.' };
-      for (const [i, link] of app.links.entries()) {
+    for (const card of d.cards) {
+      const at = { tab: 'cards' as const };
+      if (blank(card.name)) return { ...at, field: `card:${card.id}:name`, message: 'Give this card a name.' };
+      for (const [i, link] of card.links.entries()) {
         if (blank(link.label) && blank(link.url)) continue; // an empty row is simply dropped
-        if (blank(link.label)) return { ...at, field: `applink:${app.id}:${i}:label`, message: 'Give this link a label.' };
-        if (blank(link.url)) return { ...at, field: `applink:${app.id}:${i}:url`, message: 'Add an address for this link.' };
+        if (blank(link.label)) return { ...at, field: `cardlink:${card.id}:${i}:label`, message: 'Give this link a label.' };
+        if (blank(link.url)) return { ...at, field: `cardlink:${card.id}:${i}:url`, message: 'Add an address for this link.' };
       }
-      for (const env of app.envs) {
-        if (env.url.trim() && !isHttpUrl(env.url.trim())) {
-          return { ...at, field: `appenv:${app.id}:${env.env}:url`, message: 'Use a full address starting with https://' };
+      for (const [i, tile] of card.tiles.entries()) {
+        const url = tile.url.trim();
+        // a column's tile has a row of its own while columns are on; otherwise it's listed with the rest
+        const field = d.useColumns && tile.column ? `coltile:${card.id}:${tile.column}:url` : `tile:${card.id}:${i}:url`;
+        if (tile.column) {
+          if (url && !isHttpUrl(url)) return { ...at, field, message: 'Use a full address starting with https://' };
+        } else if (url || !blank(tile.name) || !blank(tile.label)) { // an empty row is simply dropped
+          if (!isHttpUrl(url)) return { ...at, field, message: url ? 'Use a full address starting with https://' : 'Add an address for this tile.' };
         }
       }
     }
@@ -278,8 +408,25 @@ export class SettingsPanel extends LitElement {
         return { tab: 'widgets', field: `zone:${i}:tz`, message: 'Pick a time zone from the list, e.g. America/Chicago.' };
       }
     }
-    if (weather.enabled && !weather.place) {
+    if (!d.layout.sections.find(x => x.id === 'weather')?.hidden && !weather.place) {
       return { tab: 'widgets', field: 'weather:search', message: 'Search for a place to show the weather for.' };
+    }
+    for (const [i, path] of d.extensions.entries()) {
+      if (!isExtensionPath(path.trim())) {
+        return { tab: 'page', field: `ext:${i}`, message: 'Use the path of a .js file beside index.html, like extensions/notes.js.' };
+      }
+    }
+    for (const w of d.widgets.added) {
+      if (w.type === 'extension') continue; // its settings are its extension's business
+      const url = w.url.trim();
+      if (!isHttpUrl(url)) {
+        return { tab: 'widgets', field: `added:${w.id}:url`, message: url ? 'Use a full address starting with https://' : 'Add the address to show.' };
+      }
+      if (w.type === 'data') {
+        try { parseTemplate(w.template); } catch (err) {
+          return { tab: 'widgets', field: `added:${w.id}:template`, message: `The template doesn't add up: ${(err as Error).message}.` };
+        }
+      }
     }
     return undefined;
   }
@@ -291,11 +438,9 @@ export class SettingsPanel extends LitElement {
     this.mode = 'edit';
     this.tab = problem.tab;
     await this.updateComplete;
-    if (problem.appId) {
-      const details = this.querySelector<HTMLDetailsElement>(`details[data-app="${CSS.escape(problem.appId)}"]`);
-      if (details) details.open = true;
-    }
     const input = this.querySelector<HTMLInputElement>(`[data-field="${CSS.escape(problem.field)}"]`);
+    // open whatever it's folded away in: its card, the columns panel, the advanced settings
+    for (let d = input?.closest('details'); d; d = d.parentElement?.closest('details')) d.open = true;
     input?.setCustomValidity(problem.message);
     input?.focus();
     input?.reportValidity();
@@ -309,8 +454,10 @@ export class SettingsPanel extends LitElement {
     const next = clone(this.draft);
     this.dirty = false;
     this.#dialog.close();
-    transition(() => config.save(next));
-    toast(config.customized ? 'Saved in this browser' : 'Saved');
+    transition(() => {
+      config.save(next);
+      toast(config.customized ? 'Saved in this browser' : 'Saved');
+    });
   };
 
   #saveToFile = async () => {
@@ -364,23 +511,51 @@ export class SettingsPanel extends LitElement {
     if (!file) return;
     try {
       const data = parseConfigText(await file.text());
+      // someone else's CSS can make the page look like something it isn't, their widgets show other sites, and
+      // their extensions run code — so anything new of those kinds is kept only if you say so
+      const css = !!data.look.css && data.look.css !== this.draft.look.css;
+      const known = new Set(this.draft.widgets.added.map(w => (w.type === 'extension' ? '' : w.url)));
+      const showing = (w: AddedWidget) => w.type !== 'extension' && !known.has(w.url);
+      const widgets = data.widgets.added.filter(showing);
+      const scripts = data.extensions.filter(p => !this.draft.extensions.includes(p));
+      const what = [
+        css ? 'custom CSS' : '',
+        widgets.length ? `${widgets.length === 1 ? 'a widget' : `${widgets.length} widgets`} showing ${[...new Set(widgets.map(w => (w.type === 'extension' ? '' : hostOf(w.url))))].join(', ')}` : '',
+        scripts.length ? `${scripts.length === 1 ? 'an extension' : `${scripts.length} extensions`} to run (${scripts.join(', ')})` : '',
+      ].filter(Boolean).join(' and ');
+      const keep = !what || confirm(`${file.name} has ${what} in it. These can change how the page looks, load things from `
+        + 'other sites, or run code on it. Only keep them if you trust where the file came from.\n\nOK keeps them. Cancel loads the file without them.');
+      if (!keep) {
+        if (css) data.look.css = '';
+        data.widgets.added = data.widgets.added.filter(w => !showing(w));
+        data.extensions = data.extensions.filter(p => this.draft.extensions.includes(p));
+        const kept = new Set<string>([...SECTION_IDS, ...data.widgets.added.map(w => w.id)]);
+        data.layout.sections = data.layout.sections.filter(x => kept.has(x.id));
+      }
       this.#edit(() => { this.draft = data; });
-      toast(`Loaded ${file.name} — review it, then save`);
+      toast(keep ? `Loaded ${file.name} — review it, then save` : `Loaded ${file.name} without its ${what.replace(/ showing .*/, '')} — review it, then save`);
     } catch (err) {
       toast(`Couldn't read ${file.name}: ${(err as Error).message}`, 'error');
     }
   };
 
-  // ---- applications + groups ----
+  #loadExample(example: Example) {
+    const what = `the ${example.name.toLowerCase()} example`;
+    if (this.dirty && !confirm(`Replace your unsaved changes with ${what}?`)) return;
+    this.#edit(() => { this.draft = example.config(); });
+    toast(`Loaded ${what} — look through it, then Save to see it on the page`);
+  }
 
-  #addApp = async (group?: string) => {
-    const id = `app-${Date.now().toString(36)}`;
+  // ---- cards + groups ----
+
+  #addCard = async (group?: string) => {
+    const id = `card-${Date.now().toString(36)}`;
     this.#edit(() => {
-      this.draft.apps.push({ id, name: '', ...(group ? { group } : {}), links: [], envs: [] });
-      this.#openApp = id;
+      this.draft.cards.push({ id, name: '', ...(group ? { group } : {}), links: [], tiles: [] });
+      this.#openCard = id;
     });
     await this.updateComplete;
-    this.querySelector<HTMLInputElement>(`[data-field="app:${id}:name"]`)?.focus();
+    this.querySelector<HTMLInputElement>(`[data-field="card:${id}:name"]`)?.focus();
   };
 
   #addGroup = async () => {
@@ -393,118 +568,207 @@ export class SettingsPanel extends LitElement {
     this.querySelector<HTMLInputElement>(`[data-field="group:${id}:name"]`)?.focus();
   };
 
-  // its apps aren't deleted, they just move to "Other"
+  // its cards aren't deleted, they just move to "Other"
   #removeGroup(i: number) {
     const group = this.draft.groups[i];
     this.#edit(() => {
       this.draft.groups.splice(i, 1);
-      for (const app of this.draft.apps) if (app.group === group.id) delete app.group;
+      for (const card of this.draft.cards) if (card.group === group.id) delete card.group;
     });
   }
 
-  /** An app's entry for an environment, created on first edit. */
-  #appEnv(app: AppConfig, envId: string): AppEnv {
-    let env = app.envs.find(e => e.env === envId);
-    if (!env) app.envs.push(env = { env: envId, url: '' });
-    return env;
+  /** A card's tile for a column, created on first edit. */
+  #columnTile(card: CardConfig, columnId: string): TileConfig {
+    let tile = card.tiles.find(t => t.column === columnId);
+    if (!tile) card.tiles.push(tile = { column: columnId, url: '' });
+    return tile;
   }
 
-  #appEditor(app: AppConfig) {
-    const i = this.draft.apps.indexOf(app);
+  #addTile = async (card: CardConfig) => {
+    this.#edit(() => card.tiles.push({ name: '', url: '' }));
+    await this.updateComplete;
+    this.querySelector<HTMLInputElement>(`[data-field="tile:${card.id}:${card.tiles.length - 1}:name"]`)?.focus();
+  };
+
+  /** "DEV · PROD" or "5 tiles" — what a collapsed card holds. */
+  #cardSummary(card: CardConfig) {
+    const filled = card.tiles.filter(t => t.url.trim());
+    const count = (n: number) => `${n} tile${n === 1 ? '' : 's'}`;
+    if (!this.draft.useColumns) return filled.length ? count(filled.length) : 'No tiles yet';
+    const columns = this.draft.columns.filter(d => filled.some(t => t.column === d.id)).map(d => d.label);
+    const others = filled.filter(t => !t.column).length;
+    return [...columns, ...(others ? [`${count(others)} not in a column`] : [])].join(' · ') || 'No tiles yet';
+  }
+
+  #cardEditor(card: CardConfig) {
+    const i = this.draft.cards.indexOf(card);
     const act = (change: () => void) => (e: Event) => { e.preventDefault(); this.#edit(change); };
-    const configured = this.draft.environments.filter(d => app.envs.some(e => e.env === d.id && e.url.trim()));
     return html`
-      <details class="app-editor" name="app-editor" data-app=${app.id} data-sort-item ?open=${this.#openApp === app.id}>
+      <details class="app-editor" name="card-editor" data-card-editor=${card.id} data-sort-item ?open=${this.#openCard === card.id}>
         <summary>
-          ${this.#handle(app.name || 'application')}
+          ${this.#handle(card.name || 'card')}
           <span class="app-editor-chevron">${icon(ChevronDown)}</span>
-          <span class="app-editor-mark" style="--hue:${hueOf(i)}">${app.badge || initials(app.name) || '?'}</span>
-          <span class="app-editor-title">${app.name || 'Untitled application'}</span>
-          <span class="app-editor-meta">${configured.map(d => d.label).join(' · ') || 'No environments yet'}</span>
+          <span class="app-editor-mark" style="--hue:${cardHue(i)}">${card.badge || initials(card.name) || '?'}</span>
+          <span class="app-editor-title">${card.name || 'Untitled card'}</span>
+          <span class="app-editor-meta">${this.#cardSummary(card)}</span>
           <span class="app-editor-actions">
-            <button class="icon-btn xs danger" type="button" title="Delete application" aria-label="Delete ${app.name || 'application'}"
-                    @click=${act(() => this.draft.apps.splice(this.draft.apps.indexOf(app), 1))}>${icon(Trash)}</button>
+            <button class="icon-btn xs danger" type="button" title="Delete card" aria-label="Delete ${card.name || 'card'}"
+                    @click=${act(() => this.draft.cards.splice(this.draft.cards.indexOf(card), 1))}>${icon(Trash)}</button>
           </span>
         </summary>
         <div class="app-editor-body">
           <div class="field-grid">
-            ${this.#field('Name', app.name, v => (app.name = v), { field: `app:${app.id}:name`, required: true, placeholder: 'e.g. Billing' })}
-            ${this.#field('Badge', app.badge ?? '', v => (app.badge = v || undefined), {
-              field: `app:${app.id}:badge`, maxlength: 4, placeholder: initials(app.name) || 'Auto', hint: 'Up to 4 characters. Blank uses the initials.',
+            ${this.#field('Name', card.name, v => (card.name = v), {
+              field: `card:${card.id}:name`, required: true, placeholder: this.draft.useColumns ? 'e.g. Billing' : 'e.g. Side projects',
+            })}
+            ${this.#field('Badge', card.badge ?? '', v => (card.badge = v || undefined), {
+              field: `card:${card.id}:badge`, maxlength: 4, placeholder: initials(card.name) || 'Auto', hint: 'Up to 4 characters. Blank uses the initials.',
             })}
             ${this.draft.groups.length ? html`
               <label class="field">
                 <span class="field-label">Group</span>
                 <select class="input" @change=${(e: Event) => this.#edit(() => {
                   const value = (e.target as HTMLSelectElement).value;
-                  if (value) app.group = value; else delete app.group;
+                  if (value) card.group = value; else delete card.group;
                 })}>
-                  <option value="" ?selected=${!app.group}>No group (listed under “Other”)</option>
-                  ${this.draft.groups.map(g => html`<option value=${g.id} ?selected=${app.group === g.id}>${g.name || 'Untitled group'}</option>`)}
+                  <option value="" ?selected=${!card.group}>No group (listed under “Other”)</option>
+                  ${this.draft.groups.map(g => html`<option value=${g.id} ?selected=${card.group === g.id}>${g.name || 'Untitled group'}</option>`)}
                 </select>
               </label>` : nothing}
-            ${this.#field('Description', app.description ?? '', v => (app.description = v || undefined), {
-              field: `app:${app.id}:description`, wide: true, placeholder: 'What it does, who looks after it…',
+            ${this.#widthField(card, `card:${card.id}:span`)}
+            ${this.#field('Description', card.description ?? '', v => (card.description = v || undefined), {
+              field: `card:${card.id}:description`, wide: true, placeholder: 'A line about what\'s in here',
             })}
           </div>
 
-          <div class="sub-editor">
-            <div class="sub-editor-head">
-              <span class="field-label">Environments</span>
-              <span class="field-hint">Leave an address blank if the app doesn't have that environment.</span>
-            </div>
-            ${this.draft.statusChecks
-              ? this.#switch('Check whether this app\'s environments are reachable', app.health !== false, on => {
-                  if (on) delete app.health; else app.health = false;
-                })
-              : html`<p class="field-hint">Status checks are off for the whole page —
-                  <button class="link-btn" type="button" @click=${() => (this.tab = 'environments')}>change that in Environments</button>.</p>`}
-            ${this.draft.environments.length ? this.draft.environments.map(def => this.#appEnvRow(app, def)) : html`
-              <p class="field-hint">No environments are defined yet —
-                <button class="link-btn" type="button" @click=${() => (this.tab = 'environments')}>add some</button>.</p>`}
-          </div>
+          ${this.draft.statusChecks
+            ? this.#switch('Check whether this card\'s tiles are reachable', card.health !== false, on => {
+                if (on) delete card.health; else card.health = false;
+              })
+            : html`<p class="field-hint">Status checks are off for the whole page —
+                <button class="link-btn" type="button" @click=${() => (this.tab = 'page')}>change that under Page</button>.</p>`}
+
+          ${this.draft.useColumns ? this.#columnTiles(card, i) : this.#ownTiles(card, i)}
 
           <div class="sub-editor">
             <div class="sub-editor-head">
               <span class="field-label">Links</span>
-              <span class="field-hint">Docs, runbooks, repos, dashboards — shown as buttons on the app.</span>
+              <span class="field-hint">Docs, repos, dashboards — small buttons under the card's name.</span>
             </div>
-            <div class="row-list" data-sort-list="applinks:${app.id}">
-              ${app.links.map((link, j) => this.#appLinkRow(app, link, j))}
+            <div class="row-list" data-sort-list="cardlinks:${card.id}">
+              ${card.links.map((link, j) => this.#cardLinkRow(card, link, j))}
             </div>
             <button class="btn btn-ghost btn-sm" type="button"
-                    @click=${() => this.#edit(() => app.links.push({ label: '', url: '' }))}>${icon(Plus)} Add link</button>
+                    @click=${() => this.#edit(() => card.links.push({ label: '', url: '' }))}>${icon(Plus)} Add link</button>
           </div>
         </div>
       </details>
     `;
   }
 
-  #appEnvRow(app: AppConfig, def: EnvDef) {
-    const env = app.envs.find(e => e.env === def.id);
+  /** Columns on: an address per column — plus any tiles left over from when columns were off. */
+  #columnTiles(card: CardConfig, i: number) {
+    const columns = this.draft.columns;
+    const others = card.tiles.filter(t => !t.column);
     return html`
-      <div class="app-env-row" data-env style="--env:${def.color}">
-        <span class="env-pill">${def.label}</span>
-        <input class="input" aria-label="${def.label} name" placeholder="Name (optional)" .value=${env?.name ?? ''}
-               @input=${(e: Event) => this.#edit(() => { this.#appEnv(app, def.id).name = this.#value(e) || undefined; })}>
-        <input class="input mono" type="url" aria-label="${def.label} address" placeholder="https://…" .value=${env?.url ?? ''}
-               data-field="appenv:${app.id}:${def.id}:url"
-               @input=${(e: Event) => this.#edit(() => { this.#appEnv(app, def.id).url = this.#value(e); })}>
-        <label class="check" title="Show a reachability dot for this environment">
-          <input type="checkbox" .checked=${env?.health !== false && app.health !== false && this.draft.statusChecks}
-                 ?disabled=${!env?.url || app.health === false || !this.draft.statusChecks}
-                 @change=${(e: Event) => this.#edit(() => {
-                   const target = this.#appEnv(app, def.id);
-                   if ((e.target as HTMLInputElement).checked) delete target.health;
-                   else target.health = false;
-                 })}>
-          Status
-        </label>
+      <div class="sub-editor">
+        <div class="sub-editor-head">
+          <span class="field-label">Columns</span>
+          <span class="field-hint">Leave an address blank if this card doesn't have that column.</span>
+        </div>
+        ${columns.length ? columns.map(def => this.#columnTileRow(card, def)) : html`
+          <p class="field-hint">No columns yet —
+            <button class="link-btn" type="button" @click=${this.#openColumns}>add some</button>.</p>`}
+      </div>
+      ${others.length ? html`
+        <div class="sub-editor">
+          <div class="sub-editor-head">
+            <span class="field-label">Not in a column</span>
+            <span class="field-hint">Added while columns were off. They show after the columns — remove them, or move their addresses into a column.</span>
+          </div>
+          <div class="row-list" data-sort-list="tiles:${card.id}">
+            ${others.map(tile => this.#tileRow(card, tile, cardColor(i)))}
+          </div>
+        </div>` : nothing}
+    `;
+  }
+
+  /** Columns off: the card's own list of tiles, in order. */
+  #ownTiles(card: CardConfig, i: number) {
+    return html`
+      <div class="sub-editor">
+        <div class="sub-editor-head">
+          <span class="field-label">Tiles</span>
+          <span class="field-hint">Projects, sites, bookmarks — each its own tile, with an optional tag like WEB or REPO.</span>
+        </div>
+        ${card.tiles.length ? html`
+          <div class="row-list" data-sort-list="tiles:${card.id}">
+            ${card.tiles.map(tile => this.#tileRow(card, tile, cardColor(i)))}
+          </div>` : nothing}
+        <button class="btn btn-ghost btn-sm" type="button" @click=${() => this.#addTile(card)}>${icon(Plus)} Add tile</button>
       </div>
     `;
   }
 
-  #appLinkRow(app: AppConfig, link: LinkItem, j: number) {
+  /** A status checkbox, disabled when there's no address or checks are off further up. */
+  #statusCheck(tile: TileConfig | undefined, card: CardConfig, set: (on: boolean) => void) {
+    const allowed = this.draft.statusChecks && card.health !== false;
+    return html`
+      <label class="check" title="Show a reachability dot for this tile">
+        <input type="checkbox" .checked=${tile?.health !== false && allowed} ?disabled=${!tile?.url.trim() || !allowed}
+               @change=${(e: Event) => this.#edit(() => set((e.target as HTMLInputElement).checked))}>
+        Status
+      </label>`;
+  }
+
+  #columnTileRow(card: CardConfig, def: ColumnDef) {
+    const tile = card.tiles.find(t => t.column === def.id);
+    return html`
+      <div class="app-env-row" data-env style="--env:${def.color}">
+        <span class="env-pill">${def.label}</span>
+        <input class="input" aria-label="${def.label} name" placeholder="Name (optional)" .value=${tile?.name ?? ''}
+               @input=${(e: Event) => this.#edit(() => { this.#columnTile(card, def.id).name = this.#value(e) || undefined; })}>
+        <input class="input mono" type="url" aria-label="${def.label} address" placeholder="https://…" .value=${tile?.url ?? ''}
+               data-field="coltile:${card.id}:${def.id}:url"
+               @input=${(e: Event) => this.#edit(() => { this.#columnTile(card, def.id).url = this.#value(e); })}>
+        ${this.#statusCheck(tile, card, on => {
+          const target = this.#columnTile(card, def.id);
+          if (on) delete target.health; else target.health = false;
+        })}
+      </div>
+    `;
+  }
+
+  /**
+   * [⋮⋮] [colour] [TAG] [Name] [https://…] [☑ Status] [🗑]
+   * A column's tile, listed while columns are off, shows its column in place of the colour and tag.
+   */
+  #tileRow(card: CardConfig, tile: TileConfig, cardTint: string) {
+    const i = card.tiles.indexOf(tile);
+    const what = tile.name || hostOf(tile.url) || 'tile';
+    const column = tile.column ? this.draft.columns.find(c => c.id === tile.column) : undefined;
+    return html`
+      <div class="free-tile-row" data-env data-sort-item style="--env:${column?.color ?? (tile.color || cardTint)}">
+        ${this.#handle(what)}
+        ${column ? html`
+          <span class="env-pill tile-column-pill" title="Goes back in the ${column.label} column if columns are turned on">${column.label}</span>` : html`
+          <label class="color-swatch" title=${tile.color ? 'Color' : 'Color — follows the card until you pick one'}>
+            <input type="color" .value=${tile.color?.startsWith('#') ? tile.color : '#8b5cf6'} aria-label="${what} color"
+                   @input=${(e: Event) => this.#edit(() => (tile.color = (e.target as HTMLInputElement).value))}>
+          </label>
+          <input class="input env-label-input" aria-label="Tag" placeholder="Tag" maxlength="12" .value=${tile.label ?? ''}
+                 @input=${(e: Event) => this.#edit(() => { tile.label = this.#value(e) || undefined; })}>`}
+        <input class="input" aria-label="Name" placeholder="Name" .value=${tile.name ?? ''}
+               data-field="tile:${card.id}:${i}:name" @input=${(e: Event) => this.#edit(() => (tile.name = this.#value(e)))}>
+        <input class="input mono" type="url" aria-label="Address" placeholder="https://…" .value=${tile.url}
+               data-field="tile:${card.id}:${i}:url" @input=${(e: Event) => this.#edit(() => (tile.url = this.#value(e)))}>
+        ${this.#statusCheck(tile, card, on => { if (on) delete tile.health; else tile.health = false; })}
+        ${this.#remove(card.tiles, i, what)}
+      </div>
+    `;
+  }
+
+  #cardLinkRow(card: CardConfig, link: LinkItem, j: number) {
     return html`
       <div class="app-link-row" data-sort-item>
         ${this.#handle(link.label || 'link')}
@@ -516,48 +780,51 @@ export class SettingsPanel extends LitElement {
           ${LINK_ICONS.map(name => html`<option value=${name} ?selected=${(link.icon ?? 'auto') === name}>${ICON_LABELS[name]}</option>`)}
         </select>
         <input class="input" aria-label="Label" placeholder="Label" .value=${link.label}
-               data-field="applink:${app.id}:${j}:label" @input=${(e: Event) => this.#edit(() => (link.label = this.#value(e)))}>
+               data-field="cardlink:${card.id}:${j}:label" @input=${(e: Event) => this.#edit(() => (link.label = this.#value(e)))}>
         <input class="input mono" aria-label="Address" placeholder="https://…" .value=${link.url}
-               data-field="applink:${app.id}:${j}:url" @input=${(e: Event) => this.#edit(() => (link.url = this.#value(e)))}>
-        ${this.#remove(app.links, j, link.label || 'link')}
+               data-field="cardlink:${card.id}:${j}:url" @input=${(e: Event) => this.#edit(() => (link.url = this.#value(e)))}>
+        ${this.#remove(card.links, j, link.label || 'link')}
       </div>
     `;
   }
 
-  /** One group's apps — a drop target for apps dragged from any group. */
-  #appList(groupId: string, apps: AppConfig[]) {
+  /** One group's cards — a drop target for cards dragged from any group. */
+  #cardList(groupId: string, cards: CardConfig[]) {
     return html`
-      <div class="editor-list app-list" data-sort-list="apps:${groupId}" data-sort-group="apps">
-        ${repeat(apps, a => a.id, app => this.#appEditor(app))}
-        ${apps.length ? nothing : html`
-          <p class="drop-hint">Drag applications here, or
-            <button class="link-btn" type="button" @click=${() => this.#addApp(groupId || undefined)}>add one</button>.</p>`}
+      <div class="editor-list app-list" data-sort-list="cards:${groupId}" data-sort-group="cards">
+        ${repeat(cards, c => c.id, card => this.#cardEditor(card))}
+        ${cards.length ? nothing : html`
+          <p class="drop-hint">Drag cards here, or
+            <button class="link-btn" type="button" @click=${() => this.#addCard(groupId || undefined)}>add one</button>.</p>`}
       </div>`;
   }
 
-  #appsTab() {
+  #cardsTab() {
     if (this.csv) return this.#csvPanel();
-    const { apps, groups } = this.draft;
-    const appsIn = (groupId: string) => apps.filter(a => (a.group ?? '') === groupId);
+    const { cards, groups } = this.draft;
+    const cardsIn = (groupId: string) => cards.filter(c => (c.group ?? '') === groupId);
+    const count = (n: number) => `${n} card${n === 1 ? '' : 's'}`;
     return html`
       <div class="settings-section-head">
-        <p class="settings-hint">Each application is a row on the page, with a tile for every environment it has.
+        <p class="settings-hint">
+          ${this.draft.useColumns ? 'Each card is a row on the page, with a tile in each column.' : 'Each card is a row on the page with its own tiles.'}
           Drag <span class="kbd-inline">${icon(GripVertical)}</span> to reorder${groups.length ? ' or move between groups' : ''}.</p>
         <div class="section-actions">
-          <button class="btn btn-ghost btn-sm" type="button" @click=${() => (this.csv = { text: '', replace: false })}>
-            ${icon(FileSpreadsheet)} Import CSV
-          </button>
-          <button class="btn btn-ghost btn-sm" type="button" ?disabled=${!apps.length}
-                  @click=${() => download(appsToCsv(this.draft), 'launchpad-apps.csv', 'text/csv')}>
-            ${icon(Download)} Export CSV
-          </button>
+          ${this.#menu('csv', html`${icon(FileSpreadsheet)} Spreadsheet ${icon(ChevronDown)}`, html`
+            ${this.#menuItem({ label: 'Import from CSV…', glyph: Upload, hint: 'Paste rows, or open a .csv file', run: () => (this.csv = { text: '', replace: false }) })}
+            ${cards.length ? this.#menuItem({
+              label: 'Export as CSV', glyph: Download, hint: 'Every card, to edit in a spreadsheet',
+              run: () => download(cardsToCsv(this.draft), 'launchpad-cards.csv', 'text/csv'),
+            }) : nothing}`)}
           <button class="btn btn-ghost btn-sm" type="button" @click=${this.#addGroup}>${icon(FolderPlus)} Add group</button>
-          <button class="btn btn-soft btn-sm" type="button" @click=${() => this.#addApp()}>${icon(Plus)} Add application</button>
+          <button class="btn btn-soft btn-sm" type="button" @click=${() => this.#addCard()}>${icon(Plus)} Add card</button>
         </div>
       </div>
 
-      ${!apps.length && !groups.length ? html`
-        <p class="empty">No applications yet — add one, import a CSV, or
+      ${this.#columnsPanel()}
+
+      ${!cards.length && !groups.length ? html`
+        <p class="empty">No cards yet — add one, import a CSV, or
           <button class="link-btn" type="button" @click=${this.#startGuide}>run the setup guide</button>.</p>` : nothing}
 
       ${groups.length ? html`
@@ -568,23 +835,23 @@ export class SettingsPanel extends LitElement {
                 ${this.#handle(g.name || 'group')}
                 <input class="input group-name-input" aria-label="Group name" placeholder="Group name" .value=${g.name}
                        data-field="group:${g.id}:name" @input=${(e: Event) => this.#edit(() => (g.name = this.#value(e)))}>
-                <span class="group-count">${appsIn(g.id).length} app${appsIn(g.id).length === 1 ? '' : 's'}</span>
-                <button class="icon-btn xs" type="button" title="Add an application to this group"
-                        aria-label="Add an application to ${g.name || 'this group'}" @click=${() => this.#addApp(g.id)}>${icon(Plus)}</button>
-                <button class="icon-btn xs danger" type="button" title="Remove group — its apps move to Other"
+                <span class="group-count">${count(cardsIn(g.id).length)}</span>
+                <button class="icon-btn xs" type="button" title="Add a card to this group"
+                        aria-label="Add a card to ${g.name || 'this group'}" @click=${() => this.#addCard(g.id)}>${icon(Plus)}</button>
+                <button class="icon-btn xs danger" type="button" title="Remove group — its cards move to Other"
                         aria-label="Remove group ${g.name}" @click=${() => this.#removeGroup(gi)}>${icon(Trash)}</button>
               </header>
-              ${this.#appList(g.id, appsIn(g.id))}
+              ${this.#cardList(g.id, cardsIn(g.id))}
             </section>`)}
         </div>
         <section class="group-block group-other">
           <header class="group-block-head">
             <span class="group-other-name">Other</span>
-            <span class="group-count">Apps not in a group</span>
+            <span class="group-count">Cards not in a group</span>
           </header>
-          ${this.#appList('', appsIn(''))}
+          ${this.#cardList('', cardsIn(''))}
         </section>`
-      : apps.length ? this.#appList('', apps) : nothing}
+      : cards.length ? this.#cardList('', cards) : nothing}
     `;
   }
 
@@ -594,7 +861,7 @@ export class SettingsPanel extends LitElement {
     const base = { text, replace: this.csv?.replace ?? false };
     if (!text.trim()) return void (this.csv = base);
     try {
-      this.csv = { ...base, result: readAppsCsv(text, this.draft) };
+      this.csv = { ...base, result: readCardsCsv(text, this.draft) };
     } catch (err) {
       this.csv = { ...base, error: (err as Error).message };
     }
@@ -610,26 +877,40 @@ export class SettingsPanel extends LitElement {
   #importCsv = () => {
     const c = this.csv;
     if (!c?.result) return;
-    const n = c.result.apps.length;
-    if (c.replace && this.draft.apps.length && !confirm(`Replace all ${this.draft.apps.length} applications with the ${n} from the CSV?`)) return;
-    this.#edit(() => applyAppsImport(this.draft, c.result!, c.replace));
+    const n = c.result.cards.length;
+    if (c.replace && this.draft.cards.length && !confirm(`Replace all ${this.draft.cards.length} cards with the ${n} from the CSV?`)) return;
+    this.#edit(() => applyCardsImport(this.draft, c.result!, c.replace));
     this.csv = undefined;
-    toast(`Imported ${n} application${n === 1 ? '' : 's'} — review, then save`);
+    toast(`Imported ${n} card${n === 1 ? '' : 's'} — review, then save`);
   };
 
   #csvPanel() {
     const c = this.csv!;
     const r = c.result;
-    const envLabel = (id: string) => [...this.draft.environments, ...(r?.newEnvs ?? [])].find(e => e.id === id)?.label ?? id;
+    const columns = this.draft.useColumns ? this.draft.columns : [];
+    const columnLabel = (id: string) => [...this.draft.columns, ...(r?.newColumns ?? [])].find(e => e.id === id)?.label ?? id;
     const groupName = (id?: string) => [...this.draft.groups, ...(r?.newGroups ?? [])].find(g => g.id === id)?.name ?? '—';
     const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+    const tileNames = (card: CardConfig) => {
+      const names = card.tiles.map(t => (t.column ? columnLabel(t.column) : t.name || t.label || hostOf(t.url)));
+      return names.length > 4 ? `${names.slice(0, 4).join(' · ')} +${names.length - 4}` : names.join(' · ') || '—';
+    };
+    const placeholder = columns.length
+      ? `name,description,${columns.map(e => e.label).join(',')}\nBilling,Invoices and payments,https://…`
+      : 'category,name,url,tag\nSide projects,Recipe box,https://…,WEB\nReading,A good blog,https://…';
     return html`
       <div class="settings-section-head">
         <div>
-          <h3 class="panel-heading">${icon(FileSpreadsheet)} Import applications</h3>
-          <p class="settings-hint">Paste rows from a spreadsheet, or open a .csv file. Columns: <code>name</code> (required),
-            <code>description</code>, <code>group</code>, <code>badge</code>, one per environment named by its label (like
-            <code>${this.draft.environments[0]?.label ?? 'DEV'}</code>), and <code>link:Docs</code>-style columns for links.</p>
+          <h3 class="panel-heading">${icon(FileSpreadsheet)} Import cards</h3>
+          <p class="settings-hint">Paste rows from a spreadsheet, or open a .csv file. Either layout works:</p>
+          <ul class="csv-layouts">
+            <li><strong>One row per link</strong> — <code>category</code>, <code>name</code> and <code>url</code>, plus
+              <code>tag</code>, <code>description</code> or <code>group</code> if you like. Rows with the same category
+              share a card.</li>
+            <li><strong>One row per card</strong>, for a page with columns — <code>name</code>, <code>description</code>,
+              <code>group</code>, <code>badge</code>, one more per column headed by its label (like
+              <code>${columns[0]?.label ?? 'DEV'}</code>), and <code>link:Docs</code>-style ones for link buttons.</li>
+          </ul>
         </div>
         <button class="icon-btn" type="button" aria-label="Close import" @click=${() => (this.csv = undefined)}>${icon(X)}</button>
       </div>
@@ -642,8 +923,7 @@ export class SettingsPanel extends LitElement {
           ${icon(Download)} Download a template
         </button>
       </div>
-      <textarea class="input csv-input" rows="7" spellcheck="false" aria-label="CSV to import"
-                placeholder=${`name,description,${this.draft.environments.map(e => e.label).join(',')}\nBilling,Invoices and payments,https://…`}
+      <textarea class="input csv-input" rows="7" spellcheck="false" aria-label="CSV to import" placeholder=${placeholder}
                 .value=${c.text} @input=${(e: Event) => this.#parseCsv((e.target as HTMLTextAreaElement).value)}></textarea>
       <input class="csv-file" type="file" accept=".csv,.tsv,.txt,text/csv" hidden @change=${this.#openCsvFile}>
 
@@ -651,133 +931,335 @@ export class SettingsPanel extends LitElement {
       ${r ? html`
         <div class="csv-preview">
           <p>
-            <strong>${plural(r.apps.length, 'application')}</strong>
-            · environments: ${r.envLabels.join(', ') || 'none'}
-            ${r.newEnvs.length ? html`<span class="csv-new">(new: ${r.newEnvs.map(e => e.label).join(', ')})</span>` : nothing}
+            <strong>${plural(r.cards.length, 'card')}</strong> · ${plural(r.tileCount, 'tile')}
+            ${r.columnLabels.length ? html` · columns: ${r.columnLabels.join(', ')}` : nothing}
+            ${r.newColumns.length ? html`<span class="csv-new">(new: ${r.newColumns.map(e => e.label).join(', ')})</span>` : nothing}
             ${r.linkLabels.length ? html` · links: ${r.linkLabels.join(', ')}` : nothing}
             ${r.newGroups.length ? html` · new groups: ${r.newGroups.map(g => g.name).join(', ')}` : nothing}
           </p>
           ${r.warnings.map(w => html`<p class="csv-note">${icon(TriangleAlert)} ${w}</p>`)}
           <table class="csv-table">
-            <thead><tr><th>Name</th><th>Group</th><th>Environments</th><th>Links</th></tr></thead>
+            <thead><tr><th>Card</th><th>Group</th><th>Tiles</th><th>Links</th></tr></thead>
             <tbody>
-              ${r.apps.slice(0, 6).map(a => html`
+              ${r.cards.slice(0, 6).map(card => html`
                 <tr>
-                  <td>${a.name}</td>
-                  <td>${groupName(a.group)}</td>
-                  <td>${a.envs.map(e => envLabel(e.env)).join(' · ') || '—'}</td>
-                  <td>${a.links.length || '—'}</td>
+                  <td>${card.name}</td>
+                  <td>${groupName(card.group)}</td>
+                  <td>${tileNames(card)}</td>
+                  <td>${card.links.length || '—'}</td>
                 </tr>`)}
             </tbody>
           </table>
-          ${r.apps.length > 6 ? html`<p class="field-hint">…and ${r.apps.length - 6} more.</p>` : nothing}
+          ${r.cards.length > 6 ? html`<p class="field-hint">…and ${r.cards.length - 6} more.</p>` : nothing}
           <div class="segmented" role="radiogroup" aria-label="How to import">
             <label><input type="radio" name="csv-mode" .checked=${!c.replace} @change=${() => (this.csv = { ...c, replace: false })}>
               Add new, update matching names</label>
             <label><input type="radio" name="csv-mode" .checked=${c.replace} @change=${() => (this.csv = { ...c, replace: true })}>
-              Replace all applications</label>
+              Replace all cards</label>
           </div>
         </div>` : nothing}
 
       <div class="section-actions end">
         <button class="btn btn-ghost" type="button" @click=${() => (this.csv = undefined)}>Cancel</button>
-        <button class="btn btn-primary" type="button" ?disabled=${!r?.apps.length} @click=${this.#importCsv}>
-          ${icon(ClipboardPaste)} Import ${r?.apps.length ? plural(r.apps.length, 'application') : ''}
+        <button class="btn btn-primary" type="button" ?disabled=${!r?.cards.length} @click=${this.#importCsv}>
+          ${icon(ClipboardPaste)} Import ${r?.cards.length ? plural(r.cards.length, 'card') : ''}
         </button>
       </div>
     `;
   }
 
-  // ---- environments ----
+  // ---- columns ----
 
-  #usage(envId: string) {
-    return this.draft.apps.filter(a => a.envs.some(e => e.env === envId && e.url.trim())).length;
+  #usage(columnId: string) {
+    return this.draft.cards.filter(c => c.tiles.some(t => t.column === columnId && t.url.trim())).length;
   }
 
-  #applyPreset(environments: EnvDef[]) {
-    const keep = new Set(environments.map(e => e.id));
-    const lost = this.draft.environments.filter(e => !keep.has(e.id) && this.#usage(e.id));
-    if (lost.length && !confirm(`This removes ${lost.map(e => e.label).join(', ')}, which some apps have addresses for. Continue?`)) return;
+  #applyPreset(columns: ColumnDef[]) {
+    const keep = new Set(columns.map(e => e.id));
+    const lost = this.draft.columns.filter(e => !keep.has(e.id) && this.#usage(e.id));
+    if (lost.length && !confirm(`This removes ${lost.map(e => e.label).join(', ')}, which some cards have tiles in. Continue?`)) return;
     this.#edit(() => {
-      this.draft.environments = clone(environments);
-      for (const app of this.draft.apps) app.envs = app.envs.filter(e => keep.has(e.env));
+      this.draft.columns = clone(columns);
+      for (const card of this.draft.cards) card.tiles = card.tiles.filter(t => !t.column || keep.has(t.column));
     });
   }
 
-  #removeEnv(i: number) {
-    const env = this.draft.environments[i];
-    const used = this.#usage(env.id);
-    if (used && !confirm(`${used} app${used === 1 ? ' has' : 's have'} an address for ${env.label}. Remove it anyway?`)) return;
+  #removeColumn(i: number) {
+    const column = this.draft.columns[i];
+    const used = this.#usage(column.id);
+    if (used && !confirm(`${used} card${used === 1 ? ' has a tile' : 's have tiles'} in ${column.label}. Remove it anyway?`)) return;
     this.#edit(() => {
-      this.draft.environments.splice(i, 1);
-      for (const app of this.draft.apps) app.envs = app.envs.filter(e => e.env !== env.id);
+      this.draft.columns.splice(i, 1);
+      for (const card of this.draft.cards) card.tiles = card.tiles.filter(t => t.column !== column.id);
     });
   }
 
-  #addEnv = async () => {
-    const used = new Set(this.draft.environments.map(e => e.color));
-    const ids = new Set(this.draft.environments.map(e => e.id));
-    let n = this.draft.environments.length + 1;
-    while (ids.has(`env-${n}`)) n++;
-    this.#edit(() => this.draft.environments.push({
-      id: `env-${n}`, label: '', color: NEW_ENV_COLORS.find(c => !used.has(c)) ?? '#888888',
+  #addColumn = async () => {
+    const used = new Set(this.draft.columns.map(e => e.color));
+    const ids = new Set(this.draft.columns.map(e => e.id));
+    let n = this.draft.columns.length + 1;
+    while (ids.has(`column-${n}`)) n++;
+    this.#edit(() => this.draft.columns.push({
+      id: `column-${n}`, label: '', color: NEW_COLUMN_COLORS.find(c => !used.has(c)) ?? '#888888',
     }));
     await this.updateComplete;
-    this.querySelector<HTMLInputElement>(`[data-field="envdef:${this.draft.environments.length - 1}:label"]`)?.focus();
+    this.querySelector<HTMLInputElement>(`[data-field="coldef:${this.draft.columns.length - 1}:label"]`)?.focus();
   };
 
-  #environmentsTab() {
-    const envs = this.draft.environments;
+  #openColumns = () => {
+    const panel = this.querySelector<HTMLDetailsElement>('details.columns-panel');
+    if (!panel) return;
+    panel.open = true;
+    panel.scrollIntoView({ block: 'nearest' });
+  };
+
+  /** Columns, folded away at the top of the Cards tab: what they are at a glance, and the editor inside. */
+  #columnsPanel() {
+    const { columns, useColumns } = this.draft;
+    const labels = columns.map(c => c.label).join(', ');
     return html`
-      <section class="settings-card ${this.draft.statusChecks ? '' : 'off'}">
-        <header class="settings-card-head">
-          <h3>Status checks</h3>
-          ${this.#switch('On', this.draft.statusChecks, on => (this.draft.statusChecks = on))}
-        </header>
-        <p class="field-hint">Every couple of minutes, each environment's address is pinged to show a green or red dot.
-          When the page is opened straight from a file, Chrome and Edge ask permission to reach your local network for
-          this — turn it off to stop the checks and the prompt. Checks can also be turned off for a single app, or a single
-          environment, under Applications.</p>
+      <details class="fold columns-panel ${useColumns ? 'on' : ''}">
+        <summary>
+          <span class="fold-chevron">${icon(ChevronDown)}</span>
+          <span class="fold-title">${icon(Columns3)} Columns</span>
+          <span class="columns-state">
+            ${!useColumns ? html`<span class="field-hint">Off</span>`
+              : columns.length ? columns.map(c => html`<span class="env-pill sm" data-env style="--env:${c.color}">${c.label || '?'}</span>`)
+              : html`<span class="field-hint">On, but none yet</span>`}
+          </span>
+          <span class="fold-hint">${useColumns ? 'A tile in each column on every card' : 'For a launch page: DEV, TEST, PROD lined up from card to card'}</span>
+        </summary>
+        <div class="fold-body">
+          ${this.#switch('Line tiles up in columns', useColumns, on => (this.draft.useColumns = on))}
+          <p class="field-hint">For a launch page, each card is an app with one tile per column, lined up from card to card.
+            Leave it off for a home page, where each card holds its own list of tiles.</p>
+      ${useColumns ? html`
+        <div class="preset-row">
+          <span class="field-label">Start from a preset</span>
+          ${COLUMN_PRESETS.map(p => html`
+            <button class="preset" type="button" @click=${() => this.#applyPreset(p.columns)}>
+              ${p.columns.map(e => html`<span class="preset-dot" style="background:${e.color}"></span>`)}
+              ${p.name}
+            </button>`)}
+        </div>
+        ${columns.length ? html`
+          <div class="editor-list" data-sort-list="columns">
+            ${columns.map((column, i) => html`
+              <div class="env-def-row" data-env data-sort-item style="--env:${column.color}">
+                ${this.#handle(column.label || 'column')}
+                <label class="color-swatch" title="Color">
+                  <input type="color" .value=${column.color} aria-label="${column.label || 'Column'} color"
+                         @input=${(e: Event) => this.#edit(() => (column.color = (e.target as HTMLInputElement).value))}>
+                </label>
+                <input class="input env-label-input" aria-label="Label" placeholder="e.g. QA" maxlength="12" .value=${column.label}
+                       data-field="coldef:${i}:label" @input=${(e: Event) => this.#edit(() => (column.label = this.#value(e).toUpperCase()))}>
+                <label class="check" title="Hatched tiles, as a reminder to be careful (e.g. production)">
+                  <input type="checkbox" .checked=${!!column.caution}
+                         @change=${(e: Event) => this.#edit(() => {
+                           if ((e.target as HTMLInputElement).checked) column.caution = true; else delete column.caution;
+                         })}>
+                  Handle with care
+                </label>
+                <span class="env-usage">${this.#usage(column.id)} card${this.#usage(column.id) === 1 ? '' : 's'}</span>
+                <button class="icon-btn xs danger" type="button" title="Remove" aria-label="Remove ${column.label || 'column'}"
+                        @click=${() => this.#removeColumn(i)}>${icon(Trash)}</button>
+              </div>`)}
+          </div>` : html`<p class="empty">No columns yet — start from a preset, or add your own.</p>`}
+        <button class="btn btn-soft btn-sm" type="button" @click=${this.#addColumn}>${icon(Plus)} Add column</button>`
+      : columns.length ? html`
+        <p class="settings-hint">Your columns (${labels}) are kept for when you turn this back on. Meanwhile their tiles
+          show as ordinary tiles, tagged ${labels}.</p>` : nothing}
+        </div>
+      </details>
+    `;
+  }
+
+  // ---- layout ----
+
+  /** Width (Auto, or 1–12 columns) and whether it starts a new row — for a section or a card. */
+  #widthField(p: { span?: number; newRow?: boolean }, field: string, placed?: number, first = false) {
+    return html`
+      <div class="field">
+        <span class="field-label">Width</span>
+        <div class="width-field">
+          <select class="input" data-field=${field} aria-label="Width, out of 12 columns"
+                  title="How many of the 12 columns it takes. Auto shares what's left of the row${placed && !p.span ? ` (${placed} now)` : ''}."
+                  @change=${(e: Event) => this.#edit(() => setSpan(p, (e.target as HTMLSelectElement).value))}>
+            <option value="" ?selected=${!p.span}>Auto</option>
+            ${SPANS.map(n => html`<option value=${n} ?selected=${p.span === n}>${n}</option>`)}
+          </select>
+          <span class="width-of">of 12</span>
+          <label class="check" title="Off: share the row with the one before, when there's room">
+            <input type="checkbox" .checked=${p.newRow !== false} ?disabled=${first}
+                   @change=${(e: Event) => this.#edit(() => setNewRow(p, (e.target as HTMLInputElement).checked))}>
+            New row
+          </label>
+        </div>
+      </div>`;
+  }
+
+  #arrangeOnPage = async () => {
+    if (!(await this.#check())) return;
+    const draft = clone(this.draft);
+    const changed = this.dirty;
+    this.dirty = false;
+    this.#dialog.close();
+    arrange.start(draft, changed);
+  };
+
+  #layoutTab() {
+    const { layout } = this.draft;
+    const placed = new Map(place(layout.sections.filter(x => !x.hidden)).map(p => [p.item.id, p.span]));
+    return html`
+      <div class="settings-section-head">
+        <p class="settings-hint">Everything sits on a 12-column grid. <strong>Width</strong> is how many columns a section takes,
+          and <strong>Auto</strong> shares what's left of its row. Untick <strong>New row</strong> to sit beside the one before.
+          Narrow screens stack things.</p>
+        <button class="btn btn-soft btn-sm" type="button" @click=${this.#arrangeOnPage}>${icon(LayoutGrid)} Arrange on the page</button>
+      </div>
+      <section class="settings-group">
+        <h3 class="field-label">Density</h3>
+        ${this.#choice('density', 'Density', DENSITIES, layout.density, id => this.#edit(() => (layout.density = id)))}
       </section>
-      <p class="settings-hint">Environments are the columns on the page, in this order from left to right — every app gets a
-        tile for each one it has an address for.</p>
-      <div class="preset-row">
-        <span class="field-label">Start from a preset</span>
-        ${ENV_PRESETS.map(p => html`
-          <button class="preset" type="button" @click=${() => this.#applyPreset(p.environments)}>
-            ${p.environments.map(e => html`<span class="preset-dot" style="background:${e.color}"></span>`)}
-            ${p.name}
-          </button>`)}
-      </div>
-      <div class="editor-list" data-sort-list="envs">
-        ${envs.map((env, i) => html`
-          <div class="env-def-row" data-env data-sort-item style="--env:${env.color}">
-            ${this.#handle(env.label || 'environment')}
-            <label class="color-swatch" title="Color">
-              <input type="color" .value=${env.color} aria-label="${env.label || 'Environment'} color"
-                     @input=${(e: Event) => this.#edit(() => (env.color = (e.target as HTMLInputElement).value))}>
-            </label>
-            <input class="input env-label-input" aria-label="Label" placeholder="e.g. QA" maxlength="12" .value=${env.label}
-                   data-field="envdef:${i}:label" @input=${(e: Event) => this.#edit(() => (env.label = this.#value(e).toUpperCase()))}>
-            <label class="check" title="Hatched tiles, as a reminder to be careful (e.g. production)">
-              <input type="checkbox" .checked=${!!env.caution}
-                     @change=${(e: Event) => this.#edit(() => {
-                       if ((e.target as HTMLInputElement).checked) env.caution = true; else delete env.caution;
-                     })}>
-              Handle with care
-            </label>
-            <span class="env-usage">${this.#usage(env.id)} app${this.#usage(env.id) === 1 ? '' : 's'}</span>
-            <button class="icon-btn xs danger" type="button" title="Remove" aria-label="Remove ${env.label || 'environment'}"
-                    @click=${() => this.#removeEnv(i)}>${icon(Trash)}</button>
-          </div>`)}
-      </div>
-      <button class="btn btn-soft btn-sm" type="button" @click=${this.#addEnv}>${icon(Plus)} Add environment</button>
+      <section class="settings-group">
+        <h3 class="field-label">Sections</h3>
+        <div class="editor-list" data-sort-list="sections">
+          ${layout.sections.map((section, i) => html`
+            <div class="section-row ${section.hidden ? 'is-hidden' : ''}" data-sort-item>
+              ${this.#handle(sectionName(this.draft, section.id))}
+              <span class="section-name">${sectionName(this.draft, section.id)}</span>
+              ${this.#widthField(section, `section:${section.id}:span`, placed.get(section.id), i === 0)}
+              ${section.id === 'cards'
+                ? html`<span class="field-hint">Always shown</span>`
+                : this.#switch('Show', !section.hidden, on => this.#setShown(section.id, on))}
+            </div>`)}
+        </div>
+        <p class="field-hint">Cards have a width too, in each card's settings under Cards — two half-width cards share a row.</p>
+      </section>
+    `;
+  }
+
+  // ---- look: the page's own, and yours (My view) ----
+
+  /** A row of radio buttons drawn as one pill. */
+  #choice<T extends string>(name: string, label: string, options: Option<T>[], current: T, pick: (id: T) => void) {
+    return html`
+      <div class="segmented" role="radiogroup" aria-label=${label}>
+        ${options.map(o => html`
+          <label title=${o.hint ?? nothing}>
+            <input type="radio" name=${name} .checked=${o.id === current} @change=${() => pick(o.id)}>
+            ${o.glyph ? icon(o.glyph) : nothing}${o.label}
+          </label>`)}
+      </div>`;
+  }
+
+  /**
+   * Each style as a card, with a little card of tiles drawn in it. The preview wears the style itself
+   * (data-style), so it's drawn with that style's own colours, corners, borders and type, in this theme.
+   * `page` marks the page's choice.
+   */
+  #styleCards(name: string, current: Style, pick: (id: Style) => void, page?: Style) {
+    return html`
+      <div class="style-options" role="radiogroup" aria-label="Style">
+        ${STYLES.map(id => html`
+          <label class="style-card" title=${STYLE_INFO[id].description}>
+            <input type="radio" name=${name} .checked=${id === current} @change=${() => pick(id)}>
+            <span class="style-preview" data-style=${id} aria-hidden="true">
+              <span class="sp-card">
+                <span class="sp-head"><span class="sp-mark"></span><span class="sp-title">Aa</span></span>
+                <span class="sp-tiles">
+                  ${PREVIEW_TILES.map(c => html`<span class="sp-tile" data-env style="--env:${c}"><span class="sp-tag"></span><span class="sp-line"></span></span>`)}
+                </span>
+              </span>
+              ${id === current ? html`<span class="style-current">${icon(Check)}</span>` : nothing}
+            </span>
+            <span class="style-name">
+              ${STYLE_INFO[id].name}
+              ${id === page ? html`<span class="style-tag" title="The page's own style">Page</span>` : nothing}
+            </span>
+          </label>`)}
+      </div>`;
+  }
+
+  /** "Blueprint · System theme · Still background" */
+  #lookSummary(l = config.look) {
+    return `${STYLE_INFO[l.style].name} · ${nameOf(THEMES, l.theme)} theme · ${nameOf(this.#backgrounds(), l.background)} background`;
+  }
+
+  /** The built-in backgrounds, then any that extensions add. */
+  #backgrounds(): Option<Background>[] {
+    const added = [...registry.backgrounds].filter(([id]) => id !== 'particles')
+      .map(([id, def]): Option<Background> => ({ id, label: def.name, glyph: Puzzle, hint: def.description }));
+    return [...BACKGROUNDS, ...added];
+  }
+
+  /** Your look becomes the page's (once saved), for everyone who hasn't picked their own. */
+  #makeLookEveryones = () => {
+    this.#edit(() => Object.assign(this.draft.look, { theme: look.themeMode, style: look.style, background: look.background }));
+    this.mode = 'edit';
+    this.tab = 'page';
+    toast('Your look is now the page\'s — save to share it with everyone');
+  };
+
+  /** Custom CSS, folded away at the foot of the Page tab. */
+  #customCss() {
+    const l = this.draft.look;
+    const cardId = this.draft.cards[0]?.id ?? 'billing';
+    const code = (s: string) => html`<code>${s}</code> `;
+    return html`
+      <details class="fold advanced custom-css" ?open=${this.#advancedOpen}>
+        <summary>
+          <span class="fold-chevron">${icon(ChevronDown)}</span>
+          <span class="fold-title">${icon(Code)} Custom CSS</span>
+          <span class="fold-hint">${l.css.trim() ? `${l.css.trim().split('\n').length} lines` : 'For anything else about how the page looks'}</span>
+        </summary>
+        <div class="fold-body">
+        <p class="field-hint">The page behind shows it as you type. It comes after Launchpad's own styles, so plain
+          selectors win. Set variables like <code>--accent</code> or <code>--radius</code> on <code>:root</code>, or aim
+          at one card with <code>[data-card="${cardId}"]</code>.</p>
+        ${safeMode ? html`
+          <div class="look-note" role="note">
+            ${icon(TriangleAlert)}
+            <span>Safe mode is on (<code>?safe</code> in the address), so the page isn't using its custom CSS.
+              Take <code>?safe</code> off to see it again.</span>
+          </div>` : nothing}
+        <textarea class="input csv-input css-input" rows="9" spellcheck="false" autocapitalize="off" aria-label="Custom CSS"
+                  maxlength=${MAX_CSS} .value=${l.css}
+                  placeholder=${`/* For example */\n:root { --accent: #0b7285; --radius-lg: 0.5rem; }\n[data-card="${cardId}"] { --hue: 160; }\n.hero-sub { display: none; }`}
+                  @input=${(e: Event) => this.#edit(() => (l.css = (e.target as HTMLTextAreaElement).value))}></textarea>
+        <details class="css-help">
+          <summary>Variables and hooks</summary>
+          <dl class="css-ref">
+            <dt>Colours</dt>
+            <dd>${['--accent', '--accent-2', '--accent-3', '--ink', '--muted', '--bg', '--glass', '--glass-border', '--tile', '--hairline', '--ring'].map(code)}</dd>
+            <dt>Shapes</dt>
+            <dd>${['--radius-sm', '--radius', '--radius-lg', '--radius-full', '--border-w', '--mark-radius', '--shadow'].map(code)}</dd>
+            <dt>Type</dt>
+            <dd>${['--font-heading', '--font-label', '--font-numeric', '--font-display', '--title-size', '--heading-weight'].map(code)}
+              using ${['--font-sans', '--font-serif', '--font-mono'].map(code)} or any font you load</dd>
+            <dt>Backdrop</dt>
+            <dd>${['--page-bg', '--blob-1', '--blob-2', '--blob-3', '--blob-4', '--particle', '--grain-opacity'].map(code)}</dd>
+            <dt>A card</dt>
+            <dd><code>[data-card="id"]</code> — its <code>--hue</code> (0–360) colours its badge and tiles</dd>
+            <dt>A tile</dt>
+            <dd><code>[data-tile="id"]</code> or <code>[data-column="id"]</code> — its <code>--env</code> is its colour</dd>
+            <dt>Also</dt>
+            <dd>${['[data-group="id"]', '[data-section="greeting"]', ':root[data-style="paper"]', '.theme-dark', ':root[data-density="compact"]'].map(code)}</dd>
+          </dl>
+          ${this.draft.cards.length ? html`
+            <p class="field-hint">Cards on this page: ${this.draft.cards.map(c => code(c.id))}. A tile's id comes from its name
+              (e.g. <code>recipe-box</code>), or is its column's.</p>` : nothing}
+          <p class="field-hint">If your CSS ever hides the way back here, open the page with <code>?safe</code> on the end of
+            its address to leave it off.</p>
+        </details>
+        </div>
+      </details>
     `;
   }
 
   // ---- header links ----
 
-  #linksTab() {
+  #headerLinks() {
     const { links } = this.draft;
     const add = async () => {
       this.#edit(() => links.push({ label: '', url: '' }));
@@ -785,9 +1267,10 @@ export class SettingsPanel extends LitElement {
       this.querySelector<HTMLInputElement>(`[data-field="link:${links.length - 1}:label"]`)?.focus();
     };
     return html`
-      <div class="settings-section-head">
-        <p class="settings-hint">Shown in the middle of the header bar.</p>
-        <button class="btn btn-soft" type="button" @click=${add}>${icon(Plus)} Add link</button>
+      <div class="sub-head">
+        <h3 class="field-label">Header links</h3>
+        <span class="field-hint">In the middle of the header bar</span>
+        <button class="btn btn-ghost btn-sm" type="button" @click=${add}>${icon(Plus)} Add link</button>
       </div>
       ${links.length ? html`
         <div class="editor-list" data-sort-list="links">
@@ -837,13 +1320,24 @@ export class SettingsPanel extends LitElement {
     }
   }
 
+  #shown(id: SectionId) { return !this.draft.layout.sections.find(x => x.id === id)?.hidden; }
+  #setShown(id: SectionId, on: boolean) {
+    const section = this.draft.layout.sections.find(x => x.id === id);
+    if (!section) return;
+    if (on) delete section.hidden; else section.hidden = true;
+  }
+
   #widgetsTab() {
     const { greeting, clock, weather } = this.draft.widgets;
+    const shown = (id: SectionId) => this.#shown(id);
+    const toggle = (id: SectionId) => this.#switch('Show', shown(id), on => this.#setShown(id, on));
     return html`
-      <section class="settings-card ${greeting.enabled ? '' : 'off'}">
+      <p class="settings-hint">What each widget shows. Where it sits, and how wide, is under
+        <button class="link-btn" type="button" @click=${() => (this.tab = 'layout')}>Layout</button>.</p>
+      <section class="settings-card ${shown('greeting') ? '' : 'off'}">
         <header class="settings-card-head">
           <h3>Greeting</h3>
-          ${this.#switch('Show', greeting.enabled, on => (greeting.enabled = on))}
+          ${toggle('greeting')}
         </header>
         <div class="field-grid">
           ${this.#field('Headline', greeting.title, v => (greeting.title = v), { field: 'greeting:title' })}
@@ -852,10 +1346,10 @@ export class SettingsPanel extends LitElement {
         ${this.#switch('Type it out when the page opens', greeting.typing, on => (greeting.typing = on))}
       </section>
 
-      <section class="settings-card ${clock.enabled ? '' : 'off'}">
+      <section class="settings-card ${shown('clock') ? '' : 'off'}">
         <header class="settings-card-head">
           <h3>Clock</h3>
-          ${this.#switch('Show', clock.enabled, on => (clock.enabled = on))}
+          ${toggle('clock')}
         </header>
         <p class="field-hint">The first time zone is the big clock and sets the greeting; the rest are listed underneath.</p>
         <div class="editor-list" data-sort-list="zones">
@@ -877,10 +1371,10 @@ export class SettingsPanel extends LitElement {
         <datalist id="tz-list">${TIME_ZONES.map(tz => html`<option value=${tz}></option>`)}</datalist>
       </section>
 
-      <section class="settings-card ${weather.enabled ? '' : 'off'}">
+      <section class="settings-card ${shown('weather') ? '' : 'off'}">
         <header class="settings-card-head">
           <h3>Weather</h3>
-          ${this.#switch('Show', weather.enabled, on => (weather.enabled = on))}
+          ${toggle('weather')}
         </header>
         <div class="place-current">
           ${icon(MapPin)}
@@ -914,10 +1408,294 @@ export class SettingsPanel extends LitElement {
             </label>`)}
         </div>
       </section>
+
+      ${repeat(this.draft.widgets.added, w => w.id, w => this.#addedEditor(w))}
+
+      <div class="add-widget">
+        <span class="field-label">Add a widget</span>
+        <button class="btn btn-ghost btn-sm" type="button"
+                @click=${() => this.#addWidget('embed', id => ({ id, type: 'embed', title: '', url: '', height: 320 }))}>
+          ${icon(AppWindow)} Embed a page
+        </button>
+        ${this.#menu('data', html`${icon(Braces)} Show data from a URL ${icon(ChevronDown)}`, html`
+          ${this.#menuItem({
+            label: 'Your own address', glyph: Braces, hint: 'Any address that returns JSON',
+            run: () => this.#addWidget('data', id => ({ id, type: 'data', title: '', url: '', template: '', refresh: 5 })),
+          })}
+          <div class="menu-sep" role="separator"></div>
+          <p class="menu-label">Ready-made</p>
+          ${DATA_PRESETS.map(p => this.#menuItem({
+            label: p.name, glyph: p.glyph, hint: p.hint,
+            run: () => this.#addWidget('data', id => ({ id, type: 'data', ...p.widget })),
+          }))}`)}
+        ${[...registry.widgets].map(([type, def]) => html`
+          <button class="btn btn-ghost btn-sm" type="button" title=${def.description ?? `From an extension: ${type}`}
+                  @click=${() => this.#addWidget(type, id => ({ id, type: 'extension', extension: type, title: '', options: {} }))}>
+            ${icon(Puzzle)} ${def.name}
+          </button>`)}
+      </div>
+      ${registry.widgets.size ? nothing : html`
+        <p class="field-hint">Extensions can add more kinds of widget — see
+          <button class="link-btn" type="button" @click=${() => (this.tab = 'page')}>Page → Extensions</button>.</p>`}
     `;
   }
 
-  // ---- branding ----
+  // ---- added widgets: embeds, data, and extensions' ----
+
+  #addWidget = async (prefix: string, make: (id: string) => AddedWidget) => {
+    const d = this.draft;
+    const ids = new Set<string>([...SECTION_IDS, ...d.widgets.added.map(w => w.id)]);
+    let n = 1;
+    while (ids.has(`${prefix}-${n}`)) n++;
+    const id = `${prefix}-${n}`;
+    this.#edit(() => {
+      d.widgets.added.push(make(id));
+      // in just before the cards, where it'll be seen; Layout or Arrange can move it
+      const cards = d.layout.sections.findIndex(s => s.id === 'cards');
+      d.layout.sections.splice(cards < 0 ? d.layout.sections.length : cards, 0, { id });
+    });
+    await this.updateComplete;
+    const field = this.querySelector<HTMLInputElement>(`[data-field="added:${id}:url"]`) ?? this.querySelector<HTMLInputElement>(`[data-field="added:${id}:title"]`);
+    field?.scrollIntoView({ block: 'center' });
+    field?.focus();
+  };
+
+  #removeWidget(w: AddedWidget) {
+    const d = this.draft;
+    this.#edit(() => {
+      d.widgets.added = d.widgets.added.filter(x => x !== w);
+      d.layout.sections = d.layout.sections.filter(s => s.id !== w.id);
+    });
+  }
+
+  /** Fetch a data widget's address now, to see what comes back and how the template shows it. */
+  #tryData = async (w: DataWidget) => {
+    this.tries = { ...this.tries, [w.id]: { ...this.tries[w.id], busy: true, error: undefined } };
+    try {
+      const data = await fetchData(w.url.trim());
+      this.tries = { ...this.tries, [w.id]: { busy: false, data } };
+    } catch (err) {
+      this.tries = { ...this.tries, [w.id]: { busy: false, error: (err as Error).message } };
+    }
+  };
+
+  /** Each tried data widget's preview, filled in with its template as it stands (cleaned, like on the page). */
+  #fillPreviews() {
+    for (const [id, t] of Object.entries(this.tries)) {
+      const box = this.querySelector<HTMLElement>(`.data-preview[data-preview="${CSS.escape(id)}"]`);
+      const w = this.draft.widgets.added.find(x => x.id === id);
+      if (!box || !w || w.type !== 'data' || t.data === undefined) continue;
+      try {
+        box.replaceChildren(showData(w.template, t.data));
+      } catch (err) {
+        box.replaceChildren(Object.assign(document.createElement('p'), { className: 'data-error', textContent: `Template: ${(err as Error).message}` }));
+      }
+    }
+  }
+
+  #addedEditor(w: AddedWidget) {
+    if (w.type === 'extension') return this.#extensionEditor(w);
+    const label = w.title || hostOf(w.url) || (w.type === 'embed' ? 'New embed' : 'New data widget');
+    return html`
+      <section class="settings-card added-widget ${this.#shown(w.id) ? '' : 'off'}" data-added=${w.id}>
+        <header class="settings-card-head">
+          <h3>${icon(w.type === 'embed' ? AppWindow : Braces)} ${label}
+            <span class="widget-kind">${w.type === 'embed' ? 'Embed' : 'Data'}</span></h3>
+          ${this.#switch('Show', this.#shown(w.id), on => this.#setShown(w.id, on))}
+          <button class="icon-btn xs danger" type="button" title="Remove" aria-label="Remove ${label}"
+                  @click=${() => this.#removeWidget(w)}>${icon(Trash)}</button>
+        </header>
+        <div class="field-grid">
+          ${this.#field('Title', w.title, v => (w.title = v), { field: `added:${w.id}:title`, placeholder: hostOf(w.url) || 'e.g. Status' })}
+          ${w.type === 'embed'
+            ? this.#field('Height', String(w.height), v => (w.height = Math.round(Number(v)) || 320), {
+                field: `added:${w.id}:height`, type: 'number', hint: 'In pixels, 120 to 1600.',
+              })
+            : html`
+              <label class="field">
+                <span class="field-label">Refresh</span>
+                <select class="input" @change=${(e: Event) => this.#edit(() => (w.refresh = Number((e.target as HTMLSelectElement).value)))}>
+                  ${REFRESHES.map(([minutes, text]) => html`<option value=${minutes} ?selected=${w.refresh === minutes}>${text}</option>`)}
+                </select>
+              </label>`}
+          ${this.#field('Address', w.url, v => (w.url = v.trim()), {
+            field: `added:${w.id}:url`, type: 'url', mono: true, wide: true, required: true,
+            placeholder: w.type === 'embed' ? 'https://status.example.com' : 'https://api.example.com/status.json',
+          })}
+        </div>
+        ${w.type === 'embed' ? html`
+          <p class="field-hint">Shown in a frame on the page. Some sites don't allow that and stay blank; the
+            <span class="kbd-inline">${icon(ArrowUpRight)}</span> in its corner opens them in a tab instead.</p>`
+          : this.#dataEditor(w)}
+      </section>
+    `;
+  }
+
+  /** An extension's widget: a title, and whatever settings its extension asks for. */
+  #extensionEditor(w: ExtensionWidget) {
+    const def = registry.widgets.get(w.extension);
+    const label = sectionName(this.draft, w.id);
+    const options = widgetOptions(def, w.options);
+    return html`
+      <section class="settings-card added-widget ${this.#shown(w.id) ? '' : 'off'}" data-added=${w.id}>
+        <header class="settings-card-head">
+          <h3>${icon(Puzzle)} ${label} <span class="widget-kind">${def?.name ?? w.extension}</span></h3>
+          ${this.#switch('Show', this.#shown(w.id), on => this.#setShown(w.id, on))}
+          <button class="icon-btn xs danger" type="button" title="Remove" aria-label="Remove ${label}"
+                  @click=${() => this.#removeWidget(w)}>${icon(Trash)}</button>
+        </header>
+        ${def ? html`
+          ${def.description ? html`<p class="field-hint">${def.description}</p>` : nothing}
+          <div class="field-grid">
+            ${this.#field('Title', w.title, v => (w.title = v), { field: `added:${w.id}:title`, placeholder: def.name })}
+            ${(def.fields ?? []).map(f => this.#extensionField(w, f, options[f.key]))}
+          </div>`
+        : html`<p class="field-hint">Its extension ("${w.extension}") isn't loaded, so its settings can't be shown. Add its file
+            under <button class="link-btn" type="button" @click=${() => (this.tab = 'page')}>Page → Extensions</button>.</p>`}
+      </section>
+    `;
+  }
+
+  /** One of an extension widget's settings, as the kind of input its field asks for. */
+  #extensionField(w: ExtensionWidget, f: Field, value: unknown) {
+    const set = (v: string | number | boolean) => this.#edit(() => { w.options = { ...w.options, [f.key]: v }; });
+    const field = `added:${w.id}:${f.key}`;
+    const target = (e: Event) => e.target as HTMLInputElement;
+    const hint = f.hint ? html`<span class="field-hint">${f.hint}</span>` : nothing;
+    if (f.type === 'checkbox') return html`
+      <div class="field">
+        <label class="check"><input type="checkbox" data-field=${field} .checked=${!!value} @change=${(e: Event) => set(target(e).checked)}> ${f.label}</label>
+        ${hint}
+      </div>`;
+    if (f.type === 'select') return html`
+      <label class="field">
+        <span class="field-label">${f.label}</span>
+        <select class="input" data-field=${field} @change=${(e: Event) => set(target(e).value)}>
+          ${(f.choices ?? []).map(c => (typeof c === 'string' ? { value: c, label: c } : c)).map(c => html`
+            <option value=${c.value} ?selected=${String(value) === c.value}>${c.label}</option>`)}
+        </select>
+        ${hint}
+      </label>`;
+    if (f.type === 'textarea') return html`
+      <label class="field wide">
+        <span class="field-label">${f.label}</span>
+        <textarea class="input" rows="4" data-field=${field} placeholder=${f.placeholder ?? ''} .value=${String(value ?? '')}
+                  @input=${(e: Event) => set(target(e).value)}></textarea>
+        ${hint}
+      </label>`;
+    const type = ({ number: 'number', url: 'url', date: 'date', datetime: 'datetime-local' } as Record<string, string>)[f.type ?? ''] ?? 'text';
+    return html`
+      <label class="field">
+        <span class="field-label">${f.label}</span>
+        <input class="input" type=${type} data-field=${field} placeholder=${f.placeholder ?? ''} .value=${String(value ?? '')}
+               @input=${(e: Event) => set(f.type === 'number' ? Number(target(e).value) : target(e).value)}>
+        ${hint}
+      </label>`;
+  }
+
+  /** The extension files to load, at the foot of the Page tab — with the examples that come with Launchpad. */
+  #extensions() {
+    const list = this.draft.extensions;
+    const add = async (path = '') => {
+      this.#edit(() => list.push(path));
+      await this.updateComplete;
+      if (!path) this.querySelector<HTMLInputElement>(`[data-field="ext:${list.length - 1}"]`)?.focus();
+    };
+    const state = (path: string) => {
+      if (safeMode) return html`<span class="ext-state">Off in safe mode</span>`;
+      const f = registry.files.get(path.trim());
+      if (!f) return html`<span class="ext-state">Loads once saved</span>`;
+      if (f.state === 'loading') return html`<span class="ext-state">Loading…</span>`;
+      if (f.state === 'failed') return html`<span class="ext-state bad" title=${f.error ?? ''}>${icon(TriangleAlert)} ${f.error}</span>`;
+      return html`<span class="ext-state good">${icon(Check)} ${f.adds.length ? `Adds the ${f.adds.join(', the ')}` : 'Loaded'}</span>`;
+    };
+    return html`
+      <details class="fold advanced extensions">
+        <summary>
+          <span class="fold-chevron">${icon(ChevronDown)}</span>
+          <span class="fold-title">${icon(Puzzle)} Extensions</span>
+          <span class="fold-hint">${list.length ? `${list.length} file${list.length === 1 ? '' : 's'}` : 'More widgets and backgrounds, from script files'}</span>
+        </summary>
+        <div class="fold-body">
+          <p class="field-hint">Script files beside <code>index.html</code> that add kinds of widget (under Widgets) and
+            backgrounds (in My view). They run with full access to this page, so only add files you trust. Taking one out
+            counts once the page reloads, and <code>?safe</code> in the address leaves them all out.</p>
+          ${list.length ? html`
+            <div class="editor-list" data-sort-list="extensions">
+              ${list.map((path, i) => html`
+                <div class="extension-row" data-sort-item>
+                  ${this.#handle(path || 'extension')}
+                  <input class="input mono" aria-label="Extension file" placeholder="extensions/my-widget.js" .value=${path}
+                         data-field="ext:${i}" @input=${(e: Event) => this.#edit(() => (list[i] = this.#value(e).trim()))}>
+                  ${state(path)}
+                  ${this.#remove(list, i, path || 'extension')}
+                </div>`)}
+            </div>` : nothing}
+          <div class="section-actions">
+            <button class="btn btn-ghost btn-sm" type="button" @click=${() => add()}>${icon(Plus)} Add a file</button>
+          </div>
+          <div class="sub-head">
+            <span class="field-label">Examples that come with Launchpad</span>
+            <span class="field-hint">in the extensions folder beside index.html</span>
+          </div>
+          <div class="example-cards">
+            ${BUNDLED_EXTENSIONS.map(x => {
+              const on = list.includes(x.path);
+              return html`
+                <button class="example-card" type="button" ?disabled=${on} @click=${() => add(x.path)}
+                        title=${on ? 'Already listed' : `Add ${x.path}`}>
+                  ${icon(on ? Check : Plus)}
+                  <span><strong>${x.name}</strong><span class="field-hint">${x.description}</span></span>
+                </button>`;
+            })}
+          </div>
+        </div>
+      </details>
+    `;
+  }
+
+  #dataEditor(w: DataWidget) {
+    const tried = this.tries[w.id];
+    const sample = tried?.data === undefined ? '' : typeof tried.data === 'string' ? tried.data : JSON.stringify(tried.data, null, 2);
+    const code = (s: string) => html`<code>${s}</code>`;
+    return html`
+      <label class="field">
+        <span class="field-label">Template</span>
+        <textarea class="input csv-input template-input" rows="5" spellcheck="false" autocapitalize="off" aria-label="Template"
+                  data-field="added:${w.id}:template" maxlength=${MAX_TEMPLATE} .value=${w.template}
+                  placeholder=${'<ul>{{#items}}\n  <li><a href="{{url}}">{{name}}</a> <small>{{updated | ago}}</small></li>\n{{/items}}</ul>'}
+                  @input=${(e: Event) => this.#edit(() => (w.template = this.#value(e)))}></textarea>
+        <span class="field-hint">Leave it blank to see the data as it comes. Opened from a file, the page can only read
+          servers that let other sites read them (CORS); most public APIs do.</span>
+      </label>
+      <div class="data-try">
+        <button class="btn btn-soft btn-sm ${tried?.busy ? 'spinning' : ''}" type="button" ?disabled=${!isHttpUrl(w.url)}
+                @click=${() => this.#tryData(w)}>${icon(tried?.busy ? RefreshCw : Play)} Try it</button>
+        ${tried?.error ? html`<span class="data-error">Couldn't load it: ${tried.error}</span>`
+          : tried?.data !== undefined ? html`<span class="field-hint">This is how it'll look:</span>` : nothing}
+      </div>
+      ${tried?.data !== undefined ? html`
+        <div class="data-preview data-body widget glass" data-preview=${w.id}></div>
+        <details class="css-help">
+          <summary>What came back</summary>
+          <pre class="data-raw">${sample.length > 6000 ? `${sample.slice(0, 6000)}\n…` : sample}</pre>
+        </details>` : nothing}
+      <details class="css-help">
+        <summary>Writing a template</summary>
+        <dl class="css-ref">
+          <dt>A value</dt><dd>${code('{{name}}')}, or one inside another: ${code('{{owner.login}}')}, ${code('{{items.0.title}}')}</dd>
+          <dt>A list</dt><dd>${code('{{#items}}…{{/items}}')} repeats for each item, and inside it ${code('{{name}}')} is the item's.
+            ${code('{{.}}')} is the item itself, and ${code('{{#.}}…{{/.}}')} goes through data that's a list to begin with.</dd>
+          <dt>If not</dt><dd>${code('{{^items}}Nothing yet{{/items}}')} shows when the list is empty, or a value is missing or false</dd>
+          <dt>Formats</dt><dd>${code('{{when | ago}}')} — also ${code('date')}, ${code('time')}, ${code('number')}, ${code('upper')}, ${code('lower')}</dd>
+          <dt>Markup</dt><dd>Simple tags — ${code('b')}, ${code('i')}, ${code('a')}, ${code('ul')}/${code('li')}, ${code('p')}, ${code('span')},
+            ${code('small')}, ${code('code')}, ${code('img')}, ${code('table')} — and class names, to style in custom CSS. Anything else is left out.</dd>
+        </dl>
+      </details>
+    `;
+  }
+
+  // ---- general: title, logo, heading, footer, status checks ----
 
   #uploadLogo = async (e: Event) => {
     const input = e.target as HTMLInputElement;
@@ -946,7 +1724,8 @@ export class SettingsPanel extends LitElement {
       : 'Logo added — save to apply');
   };
 
-  #brandingTab() {
+  /** The page as a whole: its name and logo, header links, status checks, its look, and custom CSS. */
+  #pageTab() {
     const { site } = this.draft;
     return html`
       <div class="field-grid">
@@ -973,62 +1752,92 @@ export class SettingsPanel extends LitElement {
           <span class="field-hint">A square SVG works best. It's shown exactly as drawn, and used as the browser-tab icon too.</span>
           <input class="logo-file" type="file" accept=".svg,image/svg+xml" hidden @change=${this.#uploadLogo}>
         </div>
-        ${this.#field('Page title', site.title, v => (site.title = v), { field: 'site:title', required: true, wide: true, hint: 'Shown in the header and the browser tab.' })}
+        ${this.#field('Page title', site.title, v => (site.title = v), { field: 'site:title', required: true, hint: 'In the header and the browser tab.' })}
+        ${this.#field('Heading', site.heading, v => (site.heading = v), {
+          field: 'site:heading', placeholder: 'e.g. Projects, Applications', hint: 'Above the cards. Blank hides it.',
+        })}
         ${this.#field('Footer text', site.footer, v => (site.footer = v), { field: 'site:footer', wide: true })}
       </div>
+
+      <section class="settings-group">${this.#headerLinks()}</section>
+
+      <section class="settings-card ${this.draft.statusChecks ? '' : 'off'}">
+        <header class="settings-card-head">
+          <h3>Status checks</h3>
+          ${this.#switch('On', this.draft.statusChecks, on => (this.draft.statusChecks = on))}
+        </header>
+        <p class="field-hint">Every couple of minutes, each tile's address is pinged to show a green or red dot. Opened
+          straight from a file, Chrome and Edge ask permission to reach your local network for this; turning checks off
+          stops the prompt. A single card or tile can be left out under Cards.</p>
+      </section>
+
+      <section class="settings-card">
+        <header class="settings-card-head">
+          <h3>Look</h3>
+          <button class="btn btn-ghost btn-sm" type="button" @click=${() => (this.mode = 'view')}>${icon(PaletteIcon)} Choose in My view</button>
+        </header>
+        <p class="field-hint"><strong>${this.#lookSummary(this.draft.look)}</strong>. Everyone sees this unless they pick
+          their own. To change it, pick a look in My view, then choose <strong>Make it everyone's</strong>.</p>
+      </section>
+
+      ${this.#customCss()}
+      ${this.#extensions()}
     `;
   }
 
   // ---- my view (applies immediately) ----
 
   #viewMode() {
-    const palette = currentPalette();
-    const mode = themeMode();
     return html`
-      <p class="settings-hint">Only for you — these choices are kept in this browser and never change the page for anyone else.</p>
+      <p class="settings-hint">Kept in this browser, and never changes the page for anyone else.</p>
+
+      ${look.customized ? html`
+        <div class="look-note" role="note">
+          ${icon(PaletteIcon)}
+          <span>This is your own look. The page's is ${this.#lookSummary()}.</span>
+          <span class="look-note-actions">
+            <button class="link-btn" type="button" @click=${() => look.reset()}>${icon(RotateCcw)} Use the page's</button>
+            <button class="link-btn" type="button" title="Copy your look into the page's settings, to save for everyone"
+                    @click=${this.#makeLookEveryones}>${icon(Users)} Make it everyone's</button>
+          </span>
+        </div>` : nothing}
 
       <section class="settings-group">
-        <h3 class="field-label">Colors</h3>
-        <div class="palette-options">
-          ${PALETTES.map(p => html`
-            <label class="palette-card">
-              <input type="radio" name="palette" .checked=${p.id === palette}
-                     @change=${() => { setPalette(p.id); this.requestUpdate(); }}>
-              <span class="palette-preview" data-preview=${p.id}>
-                ${p.swatches.map(c => html`<span class="swatch" style="background:${c}"></span>`)}
-              </span>
-              <span class="palette-name">${p.name}${p.id === palette ? html` <span class="palette-current">${icon(Check)}</span>` : nothing}</span>
-              <span class="palette-desc">${p.description}</span>
-            </label>`)}
-        </div>
+        <h3 class="field-label">Style</h3>
+        ${this.#styleCards('style', look.style, id => look.set('style', id), config.look.style)}
       </section>
 
-      <section class="settings-group">
-        <h3 class="field-label">Theme</h3>
-        <div class="segmented" role="radiogroup" aria-label="Theme">
-          ${THEMES.map(t => html`
-            <label>
-              <input type="radio" name="theme-mode" .checked=${t.id === mode}
-                     @change=${() => { setThemeMode(t.id); this.requestUpdate(); }}>
-              ${icon(t.glyph)}${t.label}
-            </label>`)}
-        </div>
-      </section>
+      <div class="look-grid">
+        <section class="settings-group">
+          <h3 class="field-label">Theme</h3>
+          ${this.#choice('theme-mode', 'Theme', THEMES, look.themeMode, id => look.set('theme', id))}
+        </section>
+        <section class="settings-group">
+          <h3 class="field-label">Background</h3>
+          ${this.#choice('background', 'Background', this.#backgrounds(), look.background, id => look.set('background', id))}
+        </section>
+      </div>
 
+      <div class="look-grid">
       <section class="settings-group">
-        <h3 class="field-label">Applications on my page</h3>
-        ${config.apps.length ? html`
+        <h3 class="field-label">Cards on my page</h3>
+        ${config.cards.length ? html`
           <div class="toggle-list">
-            ${config.apps.map((app, i) => html`
+            ${config.cards.map((card, i) => html`
               <label class="toggle-row">
-                <span class="app-editor-mark" style="--hue:${hueOf(i)}">${app.badge || initials(app.name)}</span>
-                <span class="toggle-name">${app.name}</span>
-                <input class="switch" type="checkbox" .checked=${!prefs.isHidden(app.id)} aria-label="Show ${app.name}"
-                       @change=${(e: Event) => transition(() => prefs.setHidden(app.id, !(e.target as HTMLInputElement).checked))}>
+                <span class="app-editor-mark" style="--hue:${cardHue(i)}">${card.badge || initials(card.name)}</span>
+                <span class="toggle-name">${card.name}</span>
+                <input class="switch" type="checkbox" .checked=${!prefs.isHidden(card.id)} aria-label="Show ${card.name}"
+                       @change=${(e: Event) => transition(() => prefs.setHidden(card.id, !(e.target as HTMLInputElement).checked))}>
               </label>`)}
-          </div>` : html`<p class="field-hint">No applications yet.</p>`}
+          </div>` : html`<p class="field-hint">No cards yet.</p>`}
       </section>
 
+      <div class="settings-stack">
+      <section class="settings-group">
+        <h3 class="field-label">Motion</h3>
+        ${this.#choice('motion', 'Motion', MOTIONS, look.motion, id => look.set('motion', id))}
+      </section>
       <section class="settings-group">
         <h3 class="field-label">Pins and history</h3>
         <div class="history-row">
@@ -1039,6 +1848,8 @@ export class SettingsPanel extends LitElement {
                   @click=${() => transition(() => prefs.clearRecents())}>Clear history</button>
         </div>
       </section>
+      </div>
+      </div>
     `;
   }
 
@@ -1077,18 +1888,54 @@ export class SettingsPanel extends LitElement {
     return html`The first <strong>Save to file</strong> asks you to pick the <code>launchpad.config.js</code> next to <code>index.html</code>.`;
   }
 
+  /** A button that opens a small menu (a popover in the top layer, placed beside it by anchor positioning). */
+  #menu(id: string, label: unknown, body: unknown, placement: 'down' | 'up' = 'down') {
+    return html`
+      <button class="btn btn-ghost btn-sm menu-trigger" type="button" popovertarget="menu-${id}" style="anchor-name: --menu-${id}">${label}</button>
+      <div id="menu-${id}" class="tile-menu settings-menu ${placement}" popover style="position-anchor: --menu-${id}">${body}</div>`;
+  }
+
+  #menuItem({ label, glyph, run, hint }: MenuItem) {
+    const pick = (e: Event) => {
+      (e.currentTarget as HTMLElement).closest<HTMLElement>('[popover]')?.hidePopover();
+      run();
+    };
+    return html`
+      <button class="menu-item" type="button" @click=${pick}>
+        ${icon(glyph)}${hint ? html`<span class="menu-item-text"><strong>${label}</strong><span>${hint}</span></span>` : label}
+      </button>`;
+  }
+
+  /** Opening, downloading and starting over — everything about the file except saving to it. */
+  #fileMenu() {
+    return html`
+      <p class="menu-note">${this.#fileTarget()}</p>
+      <div class="menu-sep" role="separator"></div>
+      ${this.#menuItem({
+        label: 'Open a file…', glyph: FolderOpen, hint: 'A launchpad.config.js, or a .json copy',
+        run: () => this.querySelector<HTMLInputElement>('.settings-file')?.click(),
+      })}
+      ${this.#menuItem({ label: 'Download a copy', glyph: Download, hint: 'These settings, as launchpad.config.js', run: () => download(toFileText(this.draft)) })}
+      ${config.customized ? this.#menuItem({
+        label: 'Use the file\'s version', glyph: RotateCcw, hint: 'Forget the changes saved only in this browser', run: this.#discard,
+      }) : nothing}
+      <div class="menu-sep" role="separator"></div>
+      <p class="menu-label">Start from an example</p>
+      ${EXAMPLES.map(x => this.#menuItem({ label: x.name, glyph: x.glyph, hint: x.description, run: () => this.#loadExample(x) }))}
+    `;
+  }
+
   render() {
     const editing = this.mode === 'edit';
     const tabs: Record<EditTab, () => unknown> = {
-      apps: () => this.#appsTab(),
-      environments: () => this.#environmentsTab(),
-      links: () => this.#linksTab(),
+      cards: () => this.#cardsTab(),
+      layout: () => this.#layoutTab(),
       widgets: () => this.#widgetsTab(),
-      branding: () => this.#brandingTab(),
+      page: () => this.#pageTab(),
     };
 
     return html`
-      <dialog class="settings" aria-labelledby="settings-title"
+      <dialog class="settings" aria-labelledby="settings-title" @close=${() => previewCss()}
               @cancel=${this.#onCancel} @pointerdown=${this.#onPointerDown} @click=${this.#onClick}>
         <div class="settings-frame">
           <header class="settings-head">
@@ -1122,20 +1969,8 @@ export class SettingsPanel extends LitElement {
 
           <footer class="settings-foot">
             ${editing ? html`
-              <p class="file-target">${this.#fileTarget()}</p>
               <div class="settings-foot-group">
-                <button class="btn btn-ghost btn-sm" type="button" title="Load a launchpad.config.js or .json"
-                        @click=${() => this.querySelector<HTMLInputElement>('.settings-file')?.click()}>
-                  ${icon(FolderOpen)} Open file
-                </button>
-                <button class="btn btn-ghost btn-sm" type="button" title="Download these settings as launchpad.config.js"
-                        @click=${() => download(toFileText(this.draft))}>
-                  ${icon(Download)} Download
-                </button>
-                ${config.customized ? html`
-                  <button class="btn btn-ghost btn-sm" type="button" title="Forget changes saved in this browser" @click=${this.#discard}>
-                    ${icon(RotateCcw)} Use file
-                  </button>` : nothing}
+                ${this.#menu('file', html`${icon(FolderOpen)} File ${icon(ChevronDown)}`, this.#fileMenu(), 'up')}
               </div>
               <div class="settings-foot-group">
                 <button class="btn btn-ghost" type="button" @click=${this.#requestClose}>Cancel</button>

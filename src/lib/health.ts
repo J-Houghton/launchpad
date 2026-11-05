@@ -1,5 +1,5 @@
 // src/lib/health.ts
-// Lightweight reachability checks for each environment.
+// Lightweight reachability checks for each tile.
 //
 // Requests use `no-cors`, so the browser never lets us read the response — but
 // the request only resolves if the host answered at all. "up" therefore means
@@ -33,7 +33,7 @@ class HealthMonitor extends EventTarget {
 
   get summary() {
     let up = 0, checked = 0, total = 0, pending = false;
-    for (const key of config.envs.keys()) {
+    for (const key of config.tiles.keys()) {
       const h = this.get(key);
       if (h.state === 'off') continue;
       total++;
@@ -45,9 +45,9 @@ class HealthMonitor extends EventTarget {
   }
 
   async check(key: string) {
-    const ref = config.envs.get(key);
+    const ref = config.tiles.get(key);
     if (!ref) return;
-    const url = ref.env.health ?? ref.env.url;
+    const url = ref.tile.health ?? ref.tile.url;
     if (url === false) return this.#set(key, { state: 'off' });
 
     this.#set(key, { ...this.get(key), pending: true });
@@ -62,7 +62,7 @@ class HealthMonitor extends EventTarget {
 
   checkAll() {
     this.#lastRun = Date.now();
-    return Promise.all([...config.envs.keys()].map(key => this.check(key)));
+    return Promise.all([...config.tiles.keys()].map(key => this.check(key)));
   }
 
   /** Check everything now, then every couple of minutes while the tab is visible. */
@@ -74,8 +74,19 @@ class HealthMonitor extends EventTarget {
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && Date.now() - this.#lastRun > INTERVAL_MS / 2) this.checkAll();
     });
-    // environments were added/edited in settings
-    config.addEventListener('change', () => this.checkAll());
+    // tiles were added or edited in settings — but not for other changes, like the layout
+    let checked = this.#targets();
+    config.addEventListener('change', () => {
+      const targets = this.#targets();
+      if (targets === checked) return;
+      checked = targets;
+      this.checkAll();
+    });
+  }
+
+  /** What would be checked: each tile's key and address. */
+  #targets() {
+    return [...config.tiles.values()].map(r => `${r.key} ${r.tile.health ?? r.tile.url}`).join('\n');
   }
 
   #set(key: string, value: Health) {

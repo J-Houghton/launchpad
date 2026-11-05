@@ -93,7 +93,7 @@ BASE
         z-index: 20;
     }
 
-    env-menu {
+    tile-menu {
         display: contents;
     }
 
@@ -102,9 +102,7 @@ BASE
         width: 100%;
         max-width: calc(var(--wrap-max) + 2 * var(--gutter));
         margin-inline: auto;
-        padding: 0 var(--gutter) var(--space-4);
-        display: flex;
-        flex-direction: column;
-        gap: clamp(1.5rem, 3vw, 2.25rem);
+        /* its sections are laid out by styles/layout.css */
+        padding: clamp(1.25rem, 3.5vw, 2.5rem) var(--gutter) var(--space-4);
     }
 }

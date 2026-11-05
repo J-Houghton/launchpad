@@ -19,17 +19,35 @@ const FILE_NAME = 'launchpad.config.js';
 const HEADER = `// Launchpad configuration — loaded by index.html, no rebuild needed.
 // Edit by hand (keep it valid JSON after the "="), or use the page's settings
 // (the gear at the bottom of the page, or Ctrl+,) and save to this file.
+//
+// Each card holds tiles, each with a "name", a "url" and an optional "label" (a short tag).
+// For a launch page, turn on "useColumns" and list your "columns" (e.g. DEV, TEST, PROD); each
+// tile then names its "column", and they line up from card to card. "layout" places everything
+// on a 12-column grid, and "look" sets its style and background. See the README for examples.
 `;
 
 /** JSON with small leaf objects kept on one line, so the file stays easy to read. */
 export const pretty = (data: unknown) =>
   JSON.stringify(data, null, 2).replace(/\{\n\s+([^{}[\]]*?)\n\s*\}/g, (_, body: string) => `{ ${body.split(/\n\s*/).join(' ')} }`);
 
-export const toFileText = (config: LaunchpadConfig) => `${HEADER}window.LAUNCHPAD_CONFIG = ${pretty(normalize(config))};\n`;
+/**
+ * The config as it's written to the file: custom CSS and longer data-widget templates as lists of lines
+ * (and no CSS at all when there's none), so they can be read and edited there.
+ */
+export function forFile(config: LaunchpadConfig) {
+  const data = normalize(config);
+  const { css, ...look } = data.look;
+  const added = data.widgets.added.map(w => (w.type === 'data' && w.template.includes('\n') ? { ...w, template: w.template.split('\n') } : w));
+  return { ...data, widgets: { ...data.widgets, added }, look: css ? { ...look, css: css.split('\n') } : look };
+}
+
+export const toFileText = (config: LaunchpadConfig) => `${HEADER}window.LAUNCHPAD_CONFIG = ${pretty(forFile(config))};\n`;
 
 /** Accepts a launchpad.config.js or a plain .json export. */
 export function parseConfigText(text: string): LaunchpadConfig {
-  const start = text.indexOf('{'), end = text.lastIndexOf('}');
+  // a launchpad.config.js: what's assigned (comments above it may hold braces); plain JSON: the whole thing
+  const at = text.search(/LAUNCHPAD_CONFIG\s*=/);
+  const start = text.indexOf('{', Math.max(at, 0)), end = text.lastIndexOf('}');
   if (start < 0 || end < start) throw new Error('no configuration found');
   return normalize(JSON.parse(text.slice(start, end + 1)));
 }

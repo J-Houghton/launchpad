@@ -4,7 +4,7 @@ PRIMITIVES — glass, icons, buttons, status dots
 @layer components {
     .glass {
         background: var(--glass);
-        border: 1px solid var(--glass-border);
+        border: var(--border-w) solid var(--glass-border);
         -webkit-backdrop-filter: var(--glass-blur);
         backdrop-filter: var(--glass-blur);
         box-shadow: var(--shadow), inset 0 1px 0 var(--glass-highlight);

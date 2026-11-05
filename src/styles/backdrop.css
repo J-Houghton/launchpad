@@ -84,4 +84,8 @@ BACKDROP — blobs, particles, grain
         opacity: var(--grain-opacity);
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     }
+
+    /* the other backgrounds (lib/look.ts): "still" without the particles, "plain" with just the base colour */
+    [data-background="still"] .backdrop canvas,
+    [data-background="plain"] .backdrop > * { display: none; }
 }
