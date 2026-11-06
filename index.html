@@ -26,7 +26,7 @@
         const dark = theme === 'system' ? os('(prefers-color-scheme: dark)') : theme === 'dark';
         const root = document.documentElement;
         root.classList.add(dark ? 'theme-dark' : 'theme-light');
-        root.dataset.style = pick('style', ['aurora', 'classic', 'blueprint', 'paper', 'neon', 'bold'], 'aurora');
+        root.dataset.style = pick('style', ['aurora', 'liquid', 'classic', 'blueprint', 'paper', 'neon', 'bold'], 'aurora');
         // particles, still, plain, or one an extension adds
         const isName = v => typeof v === 'string' && /^[a-z][a-z0-9-]{0,40}$/.test(v);
         root.dataset.background = isName(mine.background) ? mine.background : isName(look.background) ? look.background : 'particles';
@@ -47,7 +47,7 @@
         const isHex = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
         const isHues = v => Array.isArray(v) && v.length === 3 && v.every(h => typeof h === 'number' && Number.isFinite(h));
         const rules = [];
-        for (const name of ['aurora', 'classic', 'blueprint', 'paper', 'neon', 'bold']) {
+        for (const name of ['aurora', 'liquid', 'classic', 'blueprint', 'paper', 'neon', 'bold']) {
           const ours = look.colors?.[name] ?? {}, yours = mine.colors?.[name] ?? {};
           const hues = isHues(yours.hues) ? yours.hues : isHues(ours.hues) ? ours.hues : null;
           if (hues) rules.push(`[data-style="${name}"] { ${hues.map((h, i) => `--hue-${i + 1}: ${h};`).join(' ')} }`);

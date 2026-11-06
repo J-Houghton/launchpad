@@ -5,6 +5,7 @@ import { customElement, property } from 'lit/decorators.js';
 import { config, type TileRef } from '../config.js';
 import { prefs } from '../lib/prefs.js';
 import { health } from '../lib/health.js';
+import { panelGlass } from '../lib/panel-glass.js';
 import { StoreController } from '../lib/store-controller.js';
 import { transition, vtName } from '../lib/transition.js';
 import { Clock, Ellipsis, Pin, X, icon } from '../lib/icons.js';
@@ -65,7 +66,7 @@ export class QuickDock extends LitElement {
   #pinned() {
     const pins = prefs.pins.map(k => config.tiles.get(k)).filter(r => r !== undefined);
     return html`
-      <section class="panel glass enter" style="--i:5" aria-label="Pinned links">
+      <section class="panel glass enter" style="--i:5" aria-label="Pinned links" ${panelGlass()}>
         <header class="panel-head">
           <h2 class="panel-title">${icon(Pin)}Pinned</h2>
           ${pins.length ? html`<span class="panel-count">${pins.length}</span>` : nothing}
@@ -84,7 +85,7 @@ export class QuickDock extends LitElement {
       return ref ? [{ ref, at: r.at }] : [];
     });
     return html`
-      <section class="panel glass enter" style="--i:6" aria-label="Recently opened links">
+      <section class="panel glass enter" style="--i:6" aria-label="Recently opened links" ${panelGlass()}>
         <header class="panel-head">
           <h2 class="panel-title">${icon(Clock)}Recent</h2>
           ${recents.length ? html`

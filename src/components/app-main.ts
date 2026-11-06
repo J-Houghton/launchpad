@@ -10,6 +10,7 @@ import { prefs } from '../lib/prefs.js';
 import { health, healthLabel } from '../lib/health.js';
 import { arrange } from '../lib/arrange.js';
 import { layoutStyle, moveCard, place, type Placed } from '../lib/layout.js';
+import { panelGlass } from '../lib/panel-glass.js';
 import type { SortMove } from '../lib/sortable.js';
 import { StoreController } from '../lib/store-controller.js';
 import { transition, vtName } from '../lib/transition.js';
@@ -121,7 +122,7 @@ export class AppMain extends LitElement {
     return html`
       <article class="app-card glass enter layout-item" data-card=${card.id} data-sort-item ?data-row-start=${p.rowStart}
                style="--i:${8 + i}; --card-index:${config.cards.indexOf(card)}; ${layoutStyle(p, arranging ? vtName('card', card.id) : '')}"
-               aria-labelledby="card-${card.id}">
+               aria-labelledby="card-${card.id}" ${panelGlass()}>
         ${arranging ? arrangeTools({
           name: card.name, placement: card, placed: p.span, first,
           target: d => d.cards.find(c => c.id === card.id),

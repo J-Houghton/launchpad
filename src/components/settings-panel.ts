@@ -63,7 +63,8 @@ const ICON_LABELS: Record<LinkIcon, string> = {
 };
 
 const STYLE_INFO: Record<Style, { name: string; description: string }> = {
-  aurora: { name: 'Aurora', description: 'A soft purple and pink glow, frosted glass, and a serif headline' },
+  aurora: { name: 'Aurora', description: 'A soft purple and pink glow, glass panels, and a serif headline' },
+  liquid: { name: 'Liquid', description: 'Clear, rounded glass that bends the glow and lines behind it' },
   classic: { name: 'Classic', description: 'Crisp white panels, purple and gold, with a striped border' },
   blueprint: { name: 'Blueprint', description: 'Grid paper, square corners and monospaced type' },
   paper: { name: 'Paper', description: 'Cream stock, inked outlines and serif headings, like a printed page' },

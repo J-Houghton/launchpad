@@ -18,6 +18,13 @@ export const COMBOS: Record<Style, Combo[]> = {
     { id: 'ocean', name: 'Ocean', hues: [255, 215, 150] },
     { id: 'berry', name: 'Berry', hues: [345, 300, 20] },
   ],
+  liquid: [
+    { id: 'original', name: 'Liquid', hues: [235, 300, 185] },
+    { id: 'lagoon', name: 'Lagoon', hues: [195, 240, 160] },
+    { id: 'orchid', name: 'Orchid', hues: [310, 350, 250] },
+    { id: 'sunrise', name: 'Sunrise', hues: [35, 350, 85] },
+    { id: 'mint', name: 'Mint', hues: [160, 200, 120] },
+  ],
   classic: [
     { id: 'original', name: 'Classic', hues: [266, 38, 41.45] },
     { id: 'navy', name: 'Navy and gold', hues: [220, 38, 41.45] },

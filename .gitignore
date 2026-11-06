@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Custom package 
+LiquidGLass-UI
+
+# Dev-only labs (side-by-side experiments), kept out of the repo
+lab/
