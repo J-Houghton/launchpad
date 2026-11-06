@@ -18,6 +18,7 @@ import {
 import { arrange } from '../lib/arrange.js';
 import { COLOR_INFO, contrast, shownColors } from '../lib/colors.js';
 import { COMBOS, sameHues } from '../lib/combos.js';
+import { styleCss } from '../lib/style-css.js';
 import './color-picker.js';
 import { EXAMPLES, type Example } from '../lib/examples.js';
 import { SPANS, moveCard, place, setNewRow, setSpan } from '../lib/layout.js';
@@ -270,6 +271,7 @@ export class SettingsPanel extends LitElement {
     this.tries = {};
     this.#openCard = undefined;
     this.#advancedOpen = !!config.look.css;
+    this.#cssTouched = false;
     this.linkedFile = await linkedFileName();
     await this.updateComplete;
     this.#dialog.showModal();
@@ -1330,11 +1332,36 @@ export class SettingsPanel extends LitElement {
   }
 
   /** Custom CSS, folded away at the foot of the Page tab. */
+  /** The page's style's CSS as it is now, to start from (lib/style-css.ts); worked out again when it changes. */
+  #styleCss() {
+    const l = this.draft.look;
+    const card = this.#cssExamples().card?.id;
+    const key = JSON.stringify([l.style, l.colors ?? {}, card]);
+    if (this.#styleCssFor !== key) {
+      this.#styleCssFor = key;
+      this.#styleCssText = styleCss(l.style, STYLE_INFO[l.style].name, l.colors, card);
+    }
+    return this.#styleCssText;
+  }
+
+  #styleCssFor = '';
+  #styleCssText = '';
+  /** Typed in this time: an empty box then stays empty, rather than showing the style's CSS again. */
+  #cssTouched = false;
+
+  /** Custom CSS, folded away at the foot of the Page tab. */
   #customCss() {
     const l = this.draft.look;
     const ex = this.#cssExamples();
     const cardId = ex.card?.id ?? 'billing';
     const code = (s: string) => html`<code>${s}</code> `;
+    const style = STYLE_INFO[l.style].name;
+    // with none yet, the box starts with the style's CSS, every line commented out
+    const start = l.css || this.#cssTouched ? '' : this.#styleCss();
+    const insert = () => {
+      this.#cssTouched = true;
+      this.#edit(() => (l.css = `${l.css.trim() ? `${l.css.trimEnd()}\n\n` : ''}${this.#styleCss()}`));
+    };
     return html`
       <details class="fold advanced custom-css" ?open=${this.#advancedOpen}>
         <summary>
@@ -1343,7 +1370,10 @@ export class SettingsPanel extends LitElement {
           <span class="fold-hint">${l.css.trim() ? `${l.css.trim().split('\n').length} lines` : 'For anything else about how the page looks'}</span>
         </summary>
         <div class="fold-body">
-        <p class="field-hint">The page behind shows it as you type. It comes after Launchpad's own styles, so plain
+        <p class="field-hint">${start
+            ? html`It starts with ${style}'s CSS as the page has it now, every line commented out: uncomment one and change
+              it. `
+            : nothing}The page behind shows it as you type. It comes after Launchpad's own styles, so plain
           selectors win. Set variables like <code>--accent</code> or <code>--radius</code> on <code>:root</code>, or aim
           at one card: ${ex.card
             ? html`your “${ex.card.name || ex.card.id}” card is <code>[data-card="${ex.card.id}"]</code>.`
@@ -1354,10 +1384,19 @@ export class SettingsPanel extends LitElement {
             <span>Safe mode is on (<code>?safe</code> in the address), so the page isn't using its custom CSS.
               Take <code>?safe</code> off to see it again.</span>
           </div>` : nothing}
-        <textarea class="input csv-input css-input" rows="9" spellcheck="false" autocapitalize="off" aria-label="Custom CSS"
-                  maxlength=${MAX_CSS} .value=${l.css}
-                  placeholder=${`/* For example */\n:root { --accent: #0b7285; --radius-lg: 0.5rem; }\n[data-card="${cardId}"] { --hue: 160; }\n.hero-sub { display: none; }`}
-                  @input=${(e: Event) => this.#edit(() => (l.css = (e.target as HTMLTextAreaElement).value))}></textarea>
+        <textarea class="input csv-input css-input" rows=${start || l.css.split('\n').length > 9 ? 16 : 9}
+                  spellcheck="false" autocapitalize="off" aria-label="Custom CSS"
+                  maxlength=${MAX_CSS} .value=${l.css || start}
+                  @input=${(e: Event) => {
+                    this.#cssTouched = true;
+                    this.#edit(() => (l.css = (e.target as HTMLTextAreaElement).value));
+                  }}></textarea>
+        ${start ? nothing : html`
+          <div class="css-actions">
+            <button class="btn btn-ghost btn-sm" type="button" @click=${insert}
+                    title="Adds ${style}'s colours, corners and type as the page has them now, each line commented out">
+              ${icon(Plus)} Insert ${style}'s CSS</button>
+          </div>`}
         <details class="css-help">
           <summary>Variables and hooks</summary>
           <dl class="css-ref">
