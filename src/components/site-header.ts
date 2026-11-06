@@ -3,6 +3,7 @@ import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { config } from '../config.js';
 import { look } from '../lib/look.js';
+import { panelGlass } from '../lib/panel-glass.js';
 import { StoreController } from '../lib/store-controller.js';
 import { Moon, Sun, icon } from '../lib/icons.js';
 
@@ -24,7 +25,7 @@ export class SiteHeader extends LitElement {
     const label = look.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
     return html`
       <header class="topbar">
-        <div class="topbar-inner">
+        <div class="topbar-inner" ${panelGlass('header')}>
           <a class="brand" href="/">
             ${config.site.logo
               ? html`<img class="brand-logo" src=${config.site.logo} alt="">`
@@ -36,7 +37,7 @@ export class SiteHeader extends LitElement {
             <ul>
               ${config.links.map(l => html`<li><a href=${l.url}>${l.label}</a></li>`)}
             </ul>
-            <span class="quick-links-highlight" aria-hidden="true"></span>
+            <span class="quick-links-highlight" aria-hidden="true" ${panelGlass('drop')}></span>
           </nav>
           <button class="icon-btn theme-toggle" type="button" aria-label=${label} title=${label}
                   @click=${this.#toggleTheme}>

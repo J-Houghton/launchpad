@@ -137,7 +137,7 @@ export type Layout = {
 };
 
 /** The page's style: colours, but also shapes, type and texture (styles/tokens.css, styles/looks.css). Aurora is the default. */
-export const STYLES = ['aurora', 'classic', 'blueprint', 'paper', 'neon', 'bold'] as const;
+export const STYLES = ['aurora', 'liquid', 'classic', 'blueprint', 'paper', 'neon', 'bold'] as const;
 export type Style = (typeof STYLES)[number];
 /** What's behind the page: the style's backdrop with drifting particles, the backdrop alone, or a plain colour. */
 export const BACKGROUNDS = ['particles', 'still', 'plain'] as const;

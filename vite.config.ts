@@ -23,7 +23,8 @@ function configScript(): Plugin {
     name: 'launchpad-config-script',
     transformIndexHtml: {
       order: 'post',
-      handler: html => {
+      handler: (html, { path }) => {
+        if (path !== '/index.html') return html; // only the page itself loads the config
         if (!html.includes(marker)) throw new Error(`index.html needs a ${marker} line`);
         return html.replace(marker, '<script src="./launchpad.config.js"></script>');
       },
@@ -104,6 +105,8 @@ function saveConfigFile(): Plugin {
 export default defineConfig({
   base: './', // relative paths, so the build works from any folder (or file://)
   define: { __APP_VERSION__: JSON.stringify(VERSION) },
+  // look for dependencies from the page itself, not the pages of a package checked out alongside it
+  optimizeDeps: { entries: ['index.html'] },
   build: {
     assetsInlineLimit: () => true,
     cssCodeSplit: false,

@@ -228,6 +228,9 @@ TOKENS
         --shadow-lg: 0 2px 6px oklch(from var(--accent) 0.3 calc(c / 2) h / 0.08),
             0 30px 60px -20px oklch(from var(--accent) 0.3 calc(c * 0.7) h / 0.4);
         --ring: oklch(from var(--accent) 0.55 calc(c * 1.1) h);
+        /* liquid glass (styles/glass.css): what the panels are tinted with over the lens. It's the panel
+           colour, see-through; in dark themes taken almost to black, so the glass reads as smoked */
+        --lens-tint: color-mix(in oklab, var(--panel) 35%, transparent);
 
         --blob-1: oklch(from var(--accent) 0.74 calc(c * 0.85) h / 0.55);
         --blob-2: oklch(from var(--accent-2) 0.8 calc(c * 0.71) h / 0.45);
@@ -272,6 +275,101 @@ TOKENS
         --blob-4: oklch(from var(--accent) 0.42 calc(c * 1.06) calc(h - 35) / 0.45);
         --particle: oklch(from var(--accent) 0.86 calc(c * 0.45) h);
         --grain-opacity: 0.07;
+        --lens-tint: oklch(from var(--panel) calc(l * 0.3) c h / 0.35);
+    }
+
+    /* ---- LIQUID — clear, rounded glass that bends what's behind it: a vivid glow, and fine lines for the
+            lens to bend. In browsers that can't draw the lens, the panels are frosted instead. ---- */
+    [data-style="liquid"] {
+        color-scheme: light;
+        --hue-1: 235;
+        --hue-2: 300;
+        --hue-3: 185;
+
+        --bg: oklch(0.955 0.025 calc(var(--hue-1) - 10));
+        --backdrop-base: var(--bg);
+        --page-bg: repeating-linear-gradient(118deg, transparent 0 26px, oklch(1 0 0 / 0.55) 26px 28px);
+        --art-mask: linear-gradient(#000 0 0);
+        --ink: oklch(0.24 0.05 var(--hue-1));
+        --muted: oklch(0.46 0.04 var(--hue-1));
+        --subtle: oklch(0.6 0.03 var(--hue-1));
+        --accent: oklch(0.52 0.19 var(--hue-1));
+        --accent-2: oklch(0.6 0.2 var(--hue-2));
+        --accent-3: oklch(0.78 0.12 var(--hue-3));
+        --accent-fg: oklch(0.99 0 0);
+        --ink-mix: black;
+
+        --panel: oklch(1 0 0);
+        --glass: color-mix(in oklab, var(--panel) 22%, transparent);
+        --glass-strong: color-mix(in oklab, var(--panel) 86%, transparent);
+        --glass-border: oklch(1 0 0 / 0.7);
+        --glass-border-hover: oklch(1 0 0 / 0.95);
+        --glass-highlight: oklch(1 0 0 / 0.9);
+        --glass-blur: blur(18px) saturate(1.7);
+        --tile: color-mix(in oklab, var(--panel) 30%, transparent);
+        --tile-hover: color-mix(in oklab, var(--panel) 55%, transparent);
+        --hairline: oklch(from var(--ink) 0.35 c h / 0.1);
+        --shadow-sm: 0 1px 2px oklch(from var(--accent) 0.3 calc(c / 2) h / 0.08);
+        --shadow: 0 1px 2px oklch(from var(--accent) 0.3 calc(c / 2) h / 0.06),
+            0 14px 34px -14px oklch(from var(--accent) 0.35 calc(c * 0.7) h / 0.3);
+        --shadow-lg: 0 2px 6px oklch(from var(--accent) 0.3 calc(c / 2) h / 0.08),
+            0 30px 60px -20px oklch(from var(--accent) 0.3 calc(c * 0.7) h / 0.4);
+        --ring: oklch(from var(--accent) 0.55 calc(c * 1.1) h);
+        --lens-tint: color-mix(in oklab, var(--panel) 28%, transparent);
+
+        --blob-1: oklch(from var(--accent) 0.72 calc(c * 1.05) h / 0.85);
+        --blob-2: oklch(from var(--accent-2) 0.76 calc(c * 0.9) h / 0.75);
+        --blob-3: oklch(from var(--accent-3) 0.85 calc(c * 1.1) h / 0.85);
+        --blob-4: oklch(from var(--accent) 0.8 calc(c * 0.8) calc(h - 40) / 0.7);
+        --particle: oklch(1 0 0 / 0.9);
+        --grain-opacity: 0;
+        --card-hue: calc(var(--hue-1) - 25);
+        --card-chroma: 0.16;
+
+        --radius-sm: 0.875rem;
+        --radius: 1.375rem;
+        --radius-lg: 2.5rem;
+        --mark-radius: 38%;
+        --font-display: var(--font-sans);
+        --display-weight: 680;
+        --display-tracking: -0.045em;
+        --display-sub-style: normal;
+        --heading-weight: 640;
+    }
+
+    .theme-dark[data-style="liquid"],
+    .theme-dark [data-style="liquid"] {
+        color-scheme: dark;
+        --bg: oklch(0.17 0.035 var(--hue-1));
+        --page-bg: repeating-linear-gradient(118deg, transparent 0 26px, oklch(1 0 0 / 0.1) 26px 28px);
+        --ink: oklch(0.97 0.01 var(--hue-1));
+        --muted: oklch(0.78 0.03 var(--hue-1));
+        --subtle: oklch(0.62 0.03 var(--hue-1));
+        --accent: oklch(0.76 0.14 var(--hue-1));
+        --accent-2: oklch(0.74 0.16 var(--hue-2));
+        --accent-3: oklch(0.84 0.11 var(--hue-3));
+        --accent-fg: oklch(0.18 0.03 var(--hue-1));
+        --ink-mix: white;
+
+        --panel: oklch(0.3 0.03 var(--hue-1));
+        --glass: color-mix(in oklab, var(--panel) 28%, transparent);
+        --glass-strong: oklch(from var(--panel) calc(l - 0.05) c h / 0.9);
+        --glass-border: oklch(1 0 0 / 0.16);
+        --glass-border-hover: oklch(1 0 0 / 0.32);
+        --glass-highlight: oklch(1 0 0 / 0.14);
+        --tile: color-mix(in oklab, var(--ink) 6%, transparent);
+        --tile-hover: color-mix(in oklab, var(--ink) 11%, transparent);
+        --hairline: oklch(1 0 0 / 0.09);
+        --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
+        --shadow: 0 1px 2px oklch(0 0 0 / 0.25), 0 14px 34px -12px oklch(0 0 0 / 0.6);
+        --shadow-lg: 0 2px 6px oklch(0 0 0 / 0.3), 0 30px 60px -20px oklch(0 0 0 / 0.7);
+        --lens-tint: oklch(from var(--panel) calc(l * 0.3) c h / 0.35);
+
+        --blob-1: oklch(from var(--accent) 0.5 calc(c * 1.4) h / 0.75);
+        --blob-2: oklch(from var(--accent-2) 0.48 calc(c * 1.2) h / 0.6);
+        --blob-3: oklch(from var(--accent-3) 0.55 c h / 0.45);
+        --blob-4: oklch(from var(--accent) 0.42 c calc(h - 40) / 0.6);
+        --particle: oklch(1 0 0 / 0.75);
     }
 
     /* ---- BLUEPRINT — grid paper, square corners, monospaced type; navy at night ---- */
@@ -500,6 +598,7 @@ TOKENS
         --shadow-lg: 0 0 40px -10px color-mix(in oklab, var(--accent) 45%, transparent),
             0 30px 60px -24px oklch(from var(--ink) 0.3 calc(c * 1.4) h / 0.4);
         --ring: var(--accent-2);
+        --lens-tint: color-mix(in oklab, var(--panel) 40%, transparent);
 
         --blob-1: oklch(from var(--accent) 0.8 calc(c * 0.58) calc(h - 5) / 0.5);
         --blob-2: oklch(from var(--accent-2) 0.85 calc(c * 0.67) calc(h - 5) / 0.5);
@@ -556,6 +655,7 @@ TOKENS
         --blob-3: oklch(from var(--accent) 0.5 c calc(h - 15) / 0.4);
         --blob-4: oklch(from var(--accent) 0.4 calc(c * 0.83) calc(h - 55) / 0.4);
         --particle: oklch(from var(--accent-2) 0.9 calc(c * 0.57) h);
+        --lens-tint: oklch(from var(--panel) calc(l * 0.3) c h / 0.35);
         --grain-opacity: 0.05;
     }
 

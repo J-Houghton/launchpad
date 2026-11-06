@@ -23,13 +23,16 @@ It builds to **one self-contained `index.html`** that runs straight from disk, w
   Each is a section of its own, to place and size like the rest.
 - **Status dots**: optional reachability checks every couple of minutes. Switch them off for the whole page, a single card or a single tile.
 - **In-page settings**: edit everything in the browser (the gear at the bottom of the page, or <kbd>Ctrl</kbd>+<kbd>,</kbd>). Drag to reorder, import and export cards as CSV, and save straight back to `launchpad.config.js`.
-- **Styles**: six looks, each light or dark, that change shapes, type and texture as well as colour.
-  - **Aurora**: a frosted-glass glow.
+- **Styles**: seven looks, each light or dark, that change shapes, type and texture as well as colour.
+  - **Aurora**: a soft glow behind glass panels.
+  - **Liquid**: clear, rounded glass over a vivid glow and fine lines for it to bend.
   - **Classic**: crisp panels with striped margins.
   - **Blueprint**: grid paper, square corners and monospaced type.
   - **Paper**: a printed look, with serif headings and inked outlines.
   - **Neon**: a glowing grid at night.
   - **Bold**: chunky borders and hard shadows.
+
+  In Aurora, Liquid and Neon the panels are **liquid glass**: they bend whatever is behind them, ease in as they appear, and squish when pressed. This works in Chrome and Edge; other browsers show frosted glass instead. Less motion turns off the easing and the squish. The glass redraws whenever anything behind it moves, so to keep these styles smooth, the background moves 30 times a second, and the page's always-moving touches hold still: the drifting glow, the logo's swirl, the greeting's shimmer and the card spotlight.
 
   Behind the page there can be drifting particles, the style's backdrop alone, or a plain colour. Each style comes with a few colour combos to pick from, and any of its six colours (background, panels, text and three accents) can be fine-tuned. Every style keeps its own colours, and its glow, borders and particles follow them. Pick a look in Settings → My view; **Make it everyone's** turns yours into the page's own.
 - **My view**: personal choices stay in your browser and never change the page for anyone else. These are your look and colours, less motion, hidden cards and pins.
@@ -71,7 +74,7 @@ Everything lives in `launchpad.config.js` next to `index.html`. The source copy 
 | `cards` | `id`, `name`, `description`, `badge`, `group`, `links` (buttons under the name), `health: false` to skip its checks, `span` and `newRow` (see Layout below), and `tiles` (below) |
 | `widgets` | `greeting`; `clock` (`zones`; `"timeZone": "local"` follows the viewer); `weather` (`place`, `latitude`, `longitude`, `units`); `added`, your own widgets (see Widgets below) |
 | `layout` | `density` (`"comfortable"` or `"compact"`) and `sections`: each section once, in page order, as `{ "id", "span", "newRow", "hidden" }` |
-| `look` | the page's look: `theme` (`"system"`, `"light"` or `"dark"`), `style` (`"aurora"`, `"classic"`, `"blueprint"`, `"paper"`, `"neon"` or `"bold"`) and `background` (`"particles"`, `"still"` or `"plain"`). Anyone's own choices in My view come first. Plus `colors`, the page's own colours for any style, and `css`, its custom CSS (see below). |
+| `look` | the page's look: `theme` (`"system"`, `"light"` or `"dark"`), `style` (`"aurora"`, `"liquid"`, `"classic"`, `"blueprint"`, `"paper"`, `"neon"` or `"bold"`) and `background` (`"particles"`, `"still"` or `"plain"`). Anyone's own choices in My view come first. Plus `colors`, the page's own colours for any style, and `css`, its custom CSS (see below). |
 | `extensions` | extension files to load, as paths beside `index.html`, e.g. `"extensions/notes.js"` (see Extensions below) |
 
 On a home page, a tile is `{ "name": "Recipe box", "url": "https://…", "label": "WEB" }`. `label` is the small tag and is optional; so are `color` and `id`. Give an `id` if you want pins to survive renaming the tile.
@@ -197,6 +200,7 @@ Most changes are just a variable. Set them on `:root`, on `.theme-dark` for dark
 | Shapes | `--radius-sm`, `--radius`, `--radius-lg`, `--radius-full`, `--border-w`, `--mark-radius` (card badges), `--shadow-sm`, `--shadow`, `--shadow-lg` |
 | Type | `--font-heading`, `--font-label`, `--font-numeric`, `--font-display` (the greeting), `--title-size`, `--section-size`, `--heading-weight`. The bundled faces are `--font-sans` (Inter), `--font-serif` (Instrument Serif) and `--font-mono`. |
 | Backdrop | `--page-bg` (a pattern), `--blob-1` to `--blob-4` (the glow), `--particle`, `--grain-opacity` |
+| Glass | `--lens-tint` (what liquid glass panels are tinted with, in Aurora, Liquid and Neon) |
 
 These hooks are kept stable from version to version:
 
@@ -207,6 +211,7 @@ These hooks are kept stable from version to version:
 | `[data-group="id"]` | a group of cards (`other` for cards without one) |
 | `[data-section="…"]` | `greeting`, `clock`, `weather`, `pinned`, `recent`, `cards`, or an added widget's `id` |
 | `:root[data-style]`, `.theme-dark`, `:root[data-density="compact"]`, `:root[data-motion="reduced"]` | the look in effect |
+| `[data-lens="glass"]`, `[data-lens="frost"]` | a liquid glass panel, drawn as a lens or, where the browser can't, frosted |
 
 If your CSS ever hides the way back to Settings, open the page with `?safe` on the end of its address (`index.html?safe`). Custom CSS, colours and extensions stay off until you take `?safe` away again.
 
@@ -292,7 +297,7 @@ Everything runs in your browser. Out of the box, the only outside requests are t
 
 ## Built with
 
-[Lit](https://lit.dev/) and [Vite](https://vite.dev/), with [Lucide](https://lucide.dev/) icons and the [Inter](https://rsms.me/inter/) and [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) typefaces (SIL Open Font License 1.1), bundled into the build.
+[Lit](https://lit.dev/) and [Vite](https://vite.dev/), with [liquid-glass-filter](https://github.com/J-Houghton/LiquidGLass-UI) for the glass, [Lucide](https://lucide.dev/) icons and the [Inter](https://rsms.me/inter/) and [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) typefaces (SIL Open Font License 1.1), bundled into the build.
 
 ## License
 
