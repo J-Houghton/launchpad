@@ -1789,6 +1789,8 @@ SETTINGS — modal dialog, form controls
         tab-size: 2;
     }
 
+    .css-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: -0.25rem; }
+
     .css-help {
         display: grid;
         gap: 0.6rem;

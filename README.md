@@ -179,7 +179,11 @@ If the colours ever make the page hard to read, add `?safe` to the end of its ad
 
 ### Custom CSS
 
-For anything the styles don't cover, add your own CSS in Settings → Edit page → Page → **Custom CSS**. The page behind the settings window shows it as you type. Launchpad's own styles sit in cascade layers and yours come after them, so a plain selector is enough to win. In `launchpad.config.js` it's `look.css`, one line per entry:
+For anything the styles don't cover, add your own CSS in Settings → Edit page → Page → **Custom CSS**. The page behind the settings window shows it as you type.
+
+With no custom CSS yet, the box starts with the page's style as it is now: its colours in light and in dark, and its corners and type. Every line is commented out, so uncomment one and change it. Untouched, nothing is saved. Once there's CSS of your own, **Insert … CSS** adds the style's below it.
+
+Launchpad's own styles sit in cascade layers and yours come after them, so a plain selector is enough to win. In `launchpad.config.js` it's `look.css`, one line per entry:
 
 ```json
 "look": {

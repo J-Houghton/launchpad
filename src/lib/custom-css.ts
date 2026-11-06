@@ -9,7 +9,14 @@ import { config } from '../config.js';
 export const safeMode = new URLSearchParams(location.search).has('safe');
 
 const ID = 'launchpad-custom-css';
-const style = document.getElementById(ID) ?? document.head.appendChild(Object.assign(document.createElement('style'), { id: ID }));
+// just ahead of the colours (lib/colors.ts), as index.html puts it, so anyone's own colours win over the page's CSS
+const style = document.getElementById(ID) ?? (() => {
+  const made = Object.assign(document.createElement('style'), { id: ID });
+  const colors = document.getElementById('launchpad-colors');
+  if (colors) colors.before(made);
+  else document.head.append(made);
+  return made;
+})();
 
 /** CSS being edited in Settings, shown in place of the page's own. */
 let editing: string | undefined;
