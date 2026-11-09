@@ -32,7 +32,7 @@ It builds to **one self-contained `index.html`** that runs straight from disk, w
   - **Neon**: a glowing grid at night.
   - **Bold**: chunky borders and hard shadows.
 
-  In Aurora, Liquid and Neon the panels are **liquid glass**: they bend whatever is behind them, ease in as they appear, and squish when pressed. This works in Chrome and Edge; other browsers show frosted glass instead. Less motion turns off the easing and the squish. The glass redraws whenever anything behind it moves, so to keep these styles smooth, the background moves 30 times a second, and the page's always-moving touches hold still: the drifting glow, the logo's swirl, the greeting's shimmer and the card spotlight.
+  In Aurora, Liquid and Neon the panels are **liquid glass**: they bend whatever is behind them, catch the light along their edges (from above the page, and from the pointer as it comes near), ease in as they appear, and squish when pressed. This works in Chrome and Edge; other browsers show frosted glass instead. Less motion turns off the easing and the squish, and the light turns at once instead of gliding. The glass redraws whenever anything behind it moves, so to keep these styles smooth, the background moves 30 times a second, and the page's always-moving touches hold still: the drifting glow, the logo's swirl, the greeting's shimmer and the card spotlight.
 
   Behind the page there can be drifting particles, the style's backdrop alone, or a plain colour. Each style comes with a few colour combos to pick from, and any of its six colours (background, panels, text and three accents) can be fine-tuned. Every style keeps its own colours, and its glow, borders and particles follow them. Pick a look in Settings → My view; **Make it everyone's** turns yours into the page's own.
 - **My view**: personal choices stay in your browser and never change the page for anyone else. These are your look and colours, less motion, hidden cards and pins.
@@ -215,7 +215,7 @@ These hooks are kept stable from version to version:
 | `[data-group="id"]` | a group of cards (`other` for cards without one) |
 | `[data-section="…"]` | `greeting`, `clock`, `weather`, `pinned`, `recent`, `cards`, or an added widget's `id` |
 | `:root[data-style]`, `.theme-dark`, `:root[data-density="compact"]`, `:root[data-motion="reduced"]` | the look in effect |
-| `[data-lens="glass"]`, `[data-lens="frost"]` | a liquid glass panel, drawn as a lens or, where the browser can't, frosted |
+| `[data-lens="glass"]`, `[data-lens="frost"]` | a liquid glass panel, drawn as a lens or, where the browser can't, frosted. A lens's `::before` draws its light, so leave that one be |
 
 If your CSS ever hides the way back to Settings, open the page with `?safe` on the end of its address (`index.html?safe`). Custom CSS, colours and extensions stay off until you take `?safe` away again.
 
