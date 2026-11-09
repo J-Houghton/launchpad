@@ -9,7 +9,8 @@ import { nothing } from 'lit';
 import { AsyncDirective, PartType, directive, type ElementPart, type PartInfo } from 'lit/async-directive.js';
 import {
   attachGlassLight, attachGlassMotion, attachLiquidGlass,
-  type GlassLightHandle, type GlassLightOptions, type GlassMotionHandle, type GlassParams, type LiquidGlassHandle,
+  type GlassLightHandle, type GlassLightOptions, type GlassMotionHandle, type GlassMotionOptions, type GlassParams,
+  type LiquidGlassHandle,
 } from 'liquid-glass-filter';
 
 export type GlassSetup = {
@@ -19,10 +20,16 @@ export type GlassSetup = {
   ownStyles?: boolean;
   /** Draw it as a browser that can't draw the lens would ('frost'), or as one that can ('full'). */
   support?: 'full' | 'frost';
-  /** Ease the lens in over this many milliseconds when it first appears. */
+  /**
+   * Ease the lens in over this many milliseconds when it first appears, as the element fades in (its `enter`
+   * animation); with `motion`, the glass springs into place as it does.
+   */
   appear?: number;
-  /** Squish on press, and stretch along a drag. */
-  motion?: boolean;
+  /**
+   * Squish on press, stretch along a drag, rise a little under the pointer, and spring in on arrival; or the
+   * package's motion settings, for glass of its own (an extension's, see lib/extensions.ts).
+   */
+  motion?: boolean | GlassMotionOptions;
   /**
    * Light the rim from the page (the package's scene light, above the top of the window, so every glass is lit
    * from the same place) and from the pointer as it comes near; or leave it lit from one fixed direction.
@@ -43,10 +50,24 @@ export type GlassSetup = {
 /** Every glass on the page now. */
 export const glasses = new Set<Glass>();
 
+/**
+ * Under the pointer, a glass rises this many px along its longer side, so a wide card lifts as much as a small
+ * widget does, on a spring with a little overshoot.
+ */
+const RISE_PX = 8;
+const RISE_SPRING = { duration: 0.45, bounce: 0.25 };
+/**
+ * Pressed and dragged across, a glass stretches with the pointer's speed: by at most this many px along its
+ * longer side (the package's 12 % alone would swing a page-wide card 70 px about), and leans by at most this
+ * many px at its top and bottom.
+ */
+const STRETCH_PX = 40;
+const LEAN_PX = 12;
+
 let holder: HTMLElement | undefined;
 
 /** Where the lenses' SVG filters live: an empty corner of the page, in the same document as the panels. */
-function lensHolder() {
+export function lensHolder() {
   if (!holder) {
     holder = document.createElement('div');
     holder.className = 'lens-holder';
@@ -69,6 +90,8 @@ export class Glass {
   #params = '';
   #lit = '';
   #started = false;
+  /** Stops waiting for the element's fade-in (see #arrive). */
+  #unwait?: () => void;
 
   /**
    * Lenses waiting to start: a couple each frame, and only once their element is on the page (the lens is cut
@@ -148,6 +171,8 @@ export class Glass {
     const s = this.#setup;
     const own = !!s.ownStyles;
     const params = this.#lensParams();
+    // only a new lens arrives, not one that's starting over with new settings
+    const arriving = !!s.appear && !s.reducedMotion && !this.#started;
     this.#params = JSON.stringify(params);
     this.#handle = attachLiquidGlass(this.element, {
       ...params,
@@ -159,20 +184,62 @@ export class Glass {
       ...(s.mapScale ? { dpr: s.mapScale } : {}),
       mount: lensHolder(),
       reducedTransparency: s.reducedTransparency ?? 'auto',
-      // only a new lens eases in, not one that's starting over with new settings
-      appear: s.appear && !s.reducedMotion && !this.#started ? s.appear : undefined,
+      // flat until it arrives
+      ...(arriving ? { intensity: 0 } : {}),
       onRender: handle => this.#paint(handle),
     });
     this.#started = true;
     this.#move();
     this.#aim();
+    if (arriving) this.#arrive(this.#handle, s.appear!);
   }
 
-  /** Squish on press, or not: it comes and goes without touching the lens. */
+  /**
+   * A new panel's arrival: as it fades in (its `enter` animation, staggered down the page), its lens eases in
+   * and the glass springs into place, so the three read as one. Lenses often start before their panel's turn
+   * comes, so they wait for it. A panel that isn't fading in (the style changed under it), or is well into it,
+   * just eases its lens in: springing then would show it jump smaller first.
+   */
+  #arrive(handle: LiquidGlassHandle, ms: number) {
+    const fade = this.element.getAnimations().find(a => (a as CSSAnimation).animationName === 'enter');
+    const go = (spring: boolean) => {
+      this.#unwait?.();
+      if (this.#handle !== handle) return;
+      void handle.appear(ms);
+      if (spring) this.#motion?.enter();
+    };
+    const timing = fade?.effect?.getComputedTiming();
+    const into = fade?.playState === 'running' ? Number(fade.currentTime) - Number(timing?.delay ?? 0) : Infinity;
+    if (into > 120) return go(false);
+    if (into >= 0) return go(true);
+    // before its turn: go when the fade starts, or straight away if it's called off (arranging stops it)
+    const el = this.element;
+    const started = (e: AnimationEvent) => e.target === el && e.animationName === 'enter' && go(true);
+    const cancelled = (e: AnimationEvent) => e.target === el && e.animationName === 'enter' && go(false);
+    const late = setTimeout(() => go(false), -into + 1000);
+    el.addEventListener('animationstart', started);
+    el.addEventListener('animationcancel', cancelled);
+    this.#unwait = () => {
+      el.removeEventListener('animationstart', started);
+      el.removeEventListener('animationcancel', cancelled);
+      clearTimeout(late);
+      this.#unwait = undefined;
+    };
+  }
+
+  /** Squish, rise and stretch, or not: it comes and goes without touching the lens. */
   #move() {
-    const want = !!this.#handle && !!this.#setup.motion && !this.#setup.reducedMotion;
-    if (want && !this.#motion) this.#motion = attachGlassMotion(this.#handle!);
-    else if (!want && this.#motion) {
+    const motion = this.#setup.motion;
+    const want = !!this.#handle && !!motion && !this.#setup.reducedMotion;
+    if (want && !this.#motion) {
+      // its size on the page, not as it's drawn mid-animation
+      const longer = Math.max(this.element.offsetWidth, this.element.offsetHeight, 1);
+      const half = Math.max(this.element.offsetHeight / 2, 1);
+      this.#motion = attachGlassMotion(this.#handle!, typeof motion === 'object' ? motion : {
+        hover: { scale: Math.min(1.03, 1 + RISE_PX / longer), spring: RISE_SPRING },
+        drag: { maxStretch: Math.min(0.12, STRETCH_PX / longer), maxSkew: Math.min(14, (Math.atan(LEAN_PX / half) * 180) / Math.PI) },
+      });
+    } else if (!want && this.#motion) {
       this.#motion.destroy();
       this.#motion = undefined;
     }
@@ -215,6 +282,7 @@ export class Glass {
 
   #stop() {
     Glass.#queue.delete(this);
+    this.#unwait?.();
     this.#light?.destroy();
     this.#motion?.destroy();
     this.#handle?.destroy();

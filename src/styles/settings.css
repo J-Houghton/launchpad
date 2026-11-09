@@ -1977,4 +1977,324 @@ SETTINGS — modal dialog, form controls
     .example-card:hover { translate: 0 -2px; border-color: var(--glass-border-hover); }
     .example-card > .icon { flex: none; width: 1.25rem; height: 1.25rem; margin-top: 0.1rem; color: var(--accent); }
     .example-card > span { display: grid; gap: 0.15rem; }
+
+    /* ===============================
+    LIQUID GLASS (lib/glass-controls.ts) — in Aurora, Liquid and Neon. As Apple has it, the sheet and what's on
+    it stay as they are, and the controls float over it in glass: the header and footer, which the sheet scrolls
+    under, the rows of choices, the switches, the search fields and the menus.
+    ================================*/
+
+    /* the sheet scrolls as a whole, under its header and footer */
+    .settings[data-glass] .settings-frame {
+        gap: 0.75rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .settings[data-glass] .settings-body {
+        flex: 1 0 auto;
+        overflow: visible;
+    }
+
+    .settings[data-glass] .settings-head {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        padding: 1rem 1rem 0.5rem 1.5rem;
+        /* the scroll edge: what passes under the title fades away, so the title reads; under the tabs, which float
+           lower down, it shows through, bent by them */
+        background: linear-gradient(to bottom,
+            var(--glass-strong) 0,
+            var(--glass-strong) 3.75rem,
+            color-mix(in srgb, var(--glass-strong) 55%, transparent) 4.5rem,
+            transparent 100%);
+    }
+
+    .settings[data-glass] .settings-foot {
+        position: sticky;
+        bottom: 0;
+        z-index: 3;
+        padding: 0.6rem 1rem 0.9rem;
+        border-top: 0;
+        background: linear-gradient(to top, color-mix(in srgb, var(--glass-strong) 55%, transparent), transparent);
+        /* between its buttons, the sheet under it can still be clicked */
+        pointer-events: none;
+    }
+
+    .settings[data-glass] .settings-foot :is(button, [popover]) { pointer-events: auto; }
+
+    /* the edit tabs on a line of their own, in the header (so they float with it) */
+    .settings-head::after { content: ""; order: 9; flex-basis: 100%; height: 0; }
+    .settings-head .settings-tabs { order: 10; margin-inline: 0; }
+    .settings-head { row-gap: 0.75rem; }
+
+    @media (min-width: 40rem) {
+        /* the lifted lens may stand out past the row */
+        .settings[data-glass] .settings-tabs { overflow: visible; }
+    }
+
+    /* ---- buttons, fields, the rows and the menus, in glass ---- */
+    .settings :is(.btn, .icon-btn, .search-field, .mode-switch, .settings-tabs)[data-lens] { position: relative; }
+    .settings [data-lens="glass"]:active { scale: none; }
+
+    .settings :is(.btn, .icon-btn)[data-lens="glass"] {
+        color: var(--ink);
+        background: color-mix(in oklab, var(--panel) 30%, transparent);
+        box-shadow: 0 8px 18px -10px oklch(0 0 0 / 0.45), inset 0 0 0 1px var(--glass-border);
+    }
+
+    .settings .btn-soft[data-lens="glass"] {
+        color: var(--accent);
+        background: color-mix(in oklch, var(--accent) 14%, color-mix(in oklab, var(--panel) 30%, transparent));
+    }
+
+    /* a prominent button is tinted glass */
+    .settings .btn-primary[data-lens="glass"] {
+        color: var(--accent-fg);
+        background: color-mix(in oklch, var(--accent) 78%, transparent);
+        box-shadow:
+            0 10px 22px -10px color-mix(in oklch, var(--accent) 80%, transparent),
+            inset 0 0 0 1px color-mix(in oklch, var(--accent-fg) 18%, transparent);
+    }
+
+    .settings :is(.mode-switch, .settings-tabs)[data-lens="glass"] {
+        background: color-mix(in oklab, var(--panel) 22%, transparent);
+        box-shadow: 0 8px 20px -12px oklch(0 0 0 / 0.45), inset 0 0 0 1px var(--glass-border);
+    }
+
+    /* where the browser can't draw the lens, the floating controls are frosted, so they read over the sheet */
+    .settings[data-glass] :is(.settings-head, .settings-foot) :is(.btn, .icon-btn, .mode-switch, .settings-tabs)[data-lens="frost"] {
+        background: var(--glass-strong);
+        -webkit-backdrop-filter: var(--glass-blur);
+        backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--glass-border);
+    }
+
+    .settings .btn-primary[data-lens="frost"] { background: var(--accent); }
+
+    /* the footer's actions: with nothing to save, the save buttons merge into Done; with changes, they part from it */
+    .settings[data-glass] .settings-actions .btn {
+        max-width: 14rem;
+        transition:
+            max-width 520ms var(--ease-spring),
+            padding 520ms var(--ease-spring),
+            margin 520ms var(--ease-spring),
+            opacity var(--dur-med) ease,
+            scale 520ms var(--ease-spring),
+            background-color var(--dur-fast) ease,
+            color var(--dur-fast) ease;
+    }
+
+    .settings[data-glass] .settings-actions .btn:disabled:not(.spinning) {
+        max-width: 0;
+        margin-left: -0.4rem;
+        padding-inline: 0;
+        overflow: hidden;
+        opacity: 0;
+        scale: 0.4 0.8;
+        pointer-events: none;
+    }
+
+    .tile-menu[data-lens="glass"] {
+        -webkit-backdrop-filter: var(--lens);
+        backdrop-filter: var(--lens);
+        background: color-mix(in oklab, var(--panel) 45%, transparent);
+        border-color: var(--glass-border);
+    }
+
+    /* ---- search fields: a pill of glass that swells a little as it's typed in (kube.io's search box) ---- */
+    .search-field {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 0;
+        height: 2.375rem;
+        padding: 0 0.9rem;
+        border: 1px solid color-mix(in oklch, var(--ink) 18%, transparent);
+        border-radius: var(--radius-full);
+        color: var(--muted);
+        background: var(--glass-strong);
+        cursor: text;
+        transition:
+            scale var(--dur-slow) var(--ease-spring),
+            border-color var(--dur-fast) ease,
+            box-shadow var(--dur-fast) ease,
+            background-color var(--dur-fast) ease;
+    }
+
+    .search-field .icon { flex: none; width: 1rem; height: 1rem; }
+
+    .search-field input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        outline: none;
+        color: var(--ink);
+        background: none;
+        font: inherit;
+        font-size: var(--fs-sm);
+    }
+
+    .search-field input::placeholder { color: var(--subtle); opacity: 0.8; }
+    .search-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent); }
+    .search-field.sm { height: 2rem; padding-inline: 0.75rem; }
+    .place-search .search-field { flex: 1; }
+
+    .search-field[data-lens="glass"] {
+        border-color: transparent;
+        background: color-mix(in oklab, var(--panel) 18%, transparent);
+        box-shadow: 0 6px 16px -8px oklch(0 0 0 / 0.3), inset 0 0 0 1px var(--glass-border);
+        scale: 0.96;
+    }
+
+    .search-field[data-lens="glass"]:focus-within {
+        scale: 1;
+        background: color-mix(in oklab, var(--panel) 35%, transparent);
+        box-shadow:
+            0 8px 20px -8px oklch(0 0 0 / 0.3),
+            inset 0 0 0 1px var(--glass-border),
+            0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent);
+    }
+
+    .settings-group-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem 1rem;
+    }
+
+    /* ---- a row of choices: the selection is a solid pill, lifting into a clear lens while held ---- */
+    [data-glass-seg] {
+        position: relative;
+        isolation: isolate;
+        touch-action: pan-y;
+    }
+
+    [data-glass-seg] > :is(label, [role="tab"]) {
+        position: relative;
+        z-index: 1;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .segmented[data-glass-seg] label:has(input:checked),
+    .settings-tabs[data-glass-seg] [aria-selected="true"],
+    .mode-switch[data-glass-seg] [aria-selected="true"] {
+        background: none;
+        box-shadow: none;
+    }
+
+    .mode-switch[data-glass-seg] [aria-selected="true"] { color: var(--ink); }
+    .mode-switch[data-glass-seg] [aria-selected="true"] .icon { color: var(--accent); }
+    [data-glass-seg] .settings-tabs-indicator { display: none; }
+
+    .seg-plate,
+    .seg-lens {
+        position: absolute;
+        top: 0;
+        left: 0;
+        border-radius: var(--radius-full);
+        pointer-events: none;
+    }
+
+    :not([data-glass-seg]) > :is(.seg-plate, .seg-lens) { display: none; }
+
+    .seg-plate {
+        z-index: 0;
+        background: var(--glass-strong);
+        box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--hairline);
+    }
+
+    .seg-lens {
+        z-index: 2;
+        box-shadow: 0 8px 20px -8px oklch(0 0 0 / 0.4), inset 0 0 0 1px rgb(255 255 255 / 0.3);
+    }
+
+    /* put away: nothing drawn, its lens included */
+    .seg-lens:not([data-lifted]) {
+        visibility: hidden;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    .seg-lens:not([data-lifted])::before { display: none; }
+
+    .seg-lens[data-lens="glass"] { background: transparent; }
+
+    .seg-lens[data-lens="frost"] {
+        -webkit-backdrop-filter: blur(2px) saturate(1.6);
+        backdrop-filter: blur(2px) saturate(1.6);
+        background: rgb(255 255 255 / 0.22);
+    }
+
+    /* ---- switches: the thumb, held, swells into a clear lens over the track (kube.io's switch) ---- */
+    .settings[data-glass] .switch {
+        /* the thumb is 48 × 32 at full size, 0.62 of that at rest: these place it 3 px in from either end */
+        --thumb-from: -6.04px;
+        --thumb-travel: 16.08px;
+        --on: 0;
+        width: 52px;
+        height: 26px;
+        overflow: visible;
+        background: color-mix(in oklch, var(--accent) calc(var(--thumb-x, var(--on)) * 100%), color-mix(in oklch, var(--muted) 30%, transparent));
+        touch-action: pan-y;
+    }
+
+    .settings[data-glass] .switch:checked { --on: 1; }
+
+    .settings[data-glass] .switch::after {
+        top: 50%;
+        left: 0;
+        width: 48px;
+        height: 32px;
+        border-radius: 16px;
+        translate: calc(var(--thumb-from) + var(--thumb-x, var(--on)) * var(--thumb-travel)) -50%;
+        scale: var(--thumb-s, 0.62);
+        background: rgb(255 255 255 / calc(1 - 0.9 * var(--thumb-clear, 0)));
+        -webkit-backdrop-filter: var(--thumb-lens, none);
+        backdrop-filter: var(--thumb-lens, none);
+        box-shadow: 0 4px 22px rgb(0 0 0 / 0.1), 0 1px 4px rgb(0 0 0 / 0.18);
+        transition: translate var(--dur-med) var(--ease-spring);
+    }
+
+    .settings[data-glass] .switch[data-thumb]::after {
+        transition: none;
+        box-shadow:
+            0 4px 22px rgb(0 0 0 / 0.12),
+            inset 2px 7px 24px rgb(0 0 0 / calc(0.09 * var(--thumb-clear, 0))),
+            inset -2px -7px 24px rgb(255 255 255 / calc(0.09 * var(--thumb-clear, 0)));
+    }
+
+    /* ---- sliders: the knob, held, swells into a clear lens over the track (kube.io's slider) ---- */
+    .slider-glass {
+        position: relative;
+        display: grid;
+        align-items: center;
+    }
+
+    .slider-knob {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        width: 44px;
+        height: 30px;
+        margin: -15px 0 0 -22px;
+        border-radius: 15px;
+        pointer-events: none;
+        box-shadow:
+            0 3px 14px rgb(0 0 0 / 0.12),
+            0 1px 3px rgb(0 0 0 / 0.2),
+            inset 0 0 0 1px rgb(255 255 255 / calc(0.4 * var(--clear, 0)));
+    }
+
+    /* white at rest; clear while held */
+    .slider-knob,
+    .slider-knob[data-lens="glass"] { background: rgb(255 255 255 / calc(1 - 0.9 * var(--clear, 0))); }
+
+    :not([data-glass-slider]) > .slider-knob { display: none; }
+
+    /* the browser's own knob still takes the pointer, unseen, as wide as the glass one at rest */
+    [data-glass-slider] > input::-webkit-slider-thumb { width: 26.4px; opacity: 0; }
+    [data-glass-slider] > input::-moz-range-thumb { width: 26.4px; opacity: 0; }
 }

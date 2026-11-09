@@ -1,8 +1,9 @@
 // src/lib/panel-glass.ts
 // Liquid glass on the page's panels (the header, widgets, pinned and recent, and the cards), in the styles
-// drawn with it. A panel's lens comes and goes with the panel and with the style, eases in when it first
-// appears, and squishes when the panel is pressed. Less motion (My view, or the system's) turns the easing and
-// the squish off; so does arranging the page, where cards are dragged about.
+// drawn with it. A panel's lens comes and goes with the panel and with the style. The panel springs in as it
+// first appears, rises a little under the pointer, and squishes when pressed (and stretches as it's dragged
+// across). Less motion (My view, or the system's) turns all of that off; so does arranging the page, where
+// cards are dragged about.
 import { nothing } from 'lit';
 import { AsyncDirective, PartType, directive, type ElementPart, type PartInfo } from 'lit/async-directive.js';
 import type { GlassParams } from 'liquid-glass-filter';

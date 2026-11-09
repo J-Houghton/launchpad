@@ -7,8 +7,8 @@
 // tile then names its "column", and they line up from card to card. "layout" places everything
 // on a 12-column grid, and "look" sets its style, background and colours. See the README for examples.
 //
-// This sample also turns on two of the example extensions in the extensions folder (the search box and
-// notes, under "widgets" → "added"). Take them out of "extensions" if you don't want them.
+// This sample also turns on three of the example extensions in the extensions folder (the search box,
+// notes and a glass lens, under "widgets" → "added"). Take them out of "extensions" if you don't want them.
 window.LAUNCHPAD_CONFIG = {
   "version": 4,
   "site": { "title": "Launchpad", "heading": "Projects", "footer": "Example setup · make it yours in Settings (Ctrl + ,)" },
@@ -91,7 +91,8 @@ window.LAUNCHPAD_CONFIG = {
         "title": "",
         "options": { "engine": "duckduckgo", "placeholder": "Search the web", "newTab": true }
       },
-      { "id": "notes", "type": "extension", "extension": "notes", "title": "Notes", "options": { "lines": 3 } }
+      { "id": "notes", "type": "extension", "extension": "notes", "title": "Notes", "options": { "lines": 3 } },
+      { "id": "lens", "type": "extension", "extension": "lens", "title": "Glass lens", "options": { "zoom": "some" } }
     ]
   },
   "layout": {
@@ -101,12 +102,13 @@ window.LAUNCHPAD_CONFIG = {
       { "id": "clock", "span": 3, "newRow": false },
       { "id": "weather", "span": 3, "newRow": false },
       { "id": "search" },
-      { "id": "pinned" },
-      { "id": "recent", "span": 4, "newRow": false },
-      { "id": "notes", "span": 4, "newRow": false },
+      { "id": "pinned", "span": 3 },
+      { "id": "recent", "span": 3, "newRow": false },
+      { "id": "notes", "span": 3, "newRow": false },
+      { "id": "lens", "span": 3, "newRow": false },
       { "id": "cards" }
     ]
   },
   "look": { "theme": "system", "style": "aurora", "background": "particles" },
-  "extensions": ["extensions/search.js", "extensions/notes.js"]
+  "extensions": ["extensions/search.js", "extensions/notes.js", "extensions/lens.js"]
 };

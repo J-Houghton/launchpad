@@ -6,6 +6,8 @@
 //               links, status checks, custom CSS). A draft until saved; "Save to file" writes launchpad.config.js
 //               (see lib/config-file.ts), "Save" keeps it in this browser. The File menu opens, downloads and loads examples.
 // Open it with the faint gear in the footer, or Ctrl+, (⌘+, on a Mac).
+// In the styles drawn in liquid glass, its controls are glass too, floating over the sheet as it scrolls under them
+// (see lib/glass-controls.ts).
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
@@ -28,6 +30,7 @@ import { registry, widgetOptions, type Field } from '../lib/extensions.js';
 import { parseTemplate } from '../lib/template.js';
 import { fetchData, showData } from './added-widgets.js';
 import { dragToReorder, keyboardReorder, type SortMove } from '../lib/sortable.js';
+import { controlGlass, glassOn, glassSwitches, morphMenu, segmentedGlass } from '../lib/glass-controls.js';
 import { applyCardsImport, cardsToCsv, csvTemplate, readCardsCsv, type CardsImport } from '../lib/csv.js';
 import { openSetupGuide } from './setup-guide.js';
 import { prefs } from '../lib/prefs.js';
@@ -165,6 +168,7 @@ const BUNDLED_EXTENSIONS = [
   { path: 'extensions/countdown.js', name: 'Countdown', description: 'A widget counting down the days to a date' },
   { path: 'extensions/search.js', name: 'Search box', description: 'Search the web, or your own site — in place of the greeting, say' },
   { path: 'extensions/starfield.js', name: 'Starfield', description: 'A background of stars streaming past' },
+  { path: 'extensions/lens.js', name: 'Glass lens', description: 'A lens of liquid glass to drag about the page' },
 ];
 
 /** How often a data widget fetches its address again: [minutes, label]. */
@@ -234,6 +238,10 @@ export class SettingsPanel extends LitElement {
   @state() private csv?: { text: string; result?: CardsImport; error?: string; replace: boolean };
   /** Data widgets tried out in Settings: what came back, by widget id. */
   @state() private tries: Record<string, { busy?: boolean; data?: unknown; error?: string }> = {};
+  /** What My view's list of cards is narrowed to. */
+  @state() private cardFilter = '';
+  /** Open: its controls are glass only while it is. */
+  @state() private shown = false;
   #openCard?: string;
   #placeQuery = '';
   #downOnBackdrop = false;
@@ -259,6 +267,10 @@ export class SettingsPanel extends LitElement {
 
   get #dialog() { return this.querySelector<HTMLDialogElement>('dialog.settings')!; }
 
+  protected firstUpdated() {
+    glassSwitches(this.#dialog);
+  }
+
   async show(tab?: SettingsTab) {
     if (arrange.active) return toast('Finish arranging first — Save or Cancel at the bottom of the page');
     if (tab === 'view') this.mode = 'view';
@@ -273,14 +285,17 @@ export class SettingsPanel extends LitElement {
     this.#advancedOpen = !!config.look.css;
     this.#cssTouched = false;
     this.linkedFile = await linkedFileName();
+    this.shown = true;
     await this.updateComplete;
     this.#dialog.showModal();
     this.#previewCss();
   }
 
   updated(changed: Map<string, unknown>) {
-    // a new tab, or the other mode, starts at the top
-    if (changed.has('tab') || changed.has('mode')) this.querySelector('.settings-body')?.scrollTo(0, 0);
+    // a new tab, or the other mode, starts at the top (in the glass styles, the whole sheet scrolls)
+    if (changed.has('tab') || changed.has('mode')) {
+      for (const el of this.querySelectorAll('.settings-frame, .settings-body')) el.scrollTo(0, 0);
+    }
     this.#previewCss();
     this.#fillPreviews();
   }
@@ -991,7 +1006,7 @@ export class SettingsPanel extends LitElement {
             </tbody>
           </table>
           ${r.cards.length > 6 ? html`<p class="field-hint">…and ${r.cards.length - 6} more.</p>` : nothing}
-          <div class="segmented" role="radiogroup" aria-label="How to import">
+          <div class="segmented" role="radiogroup" aria-label="How to import" ${segmentedGlass()}>
             <label><input type="radio" name="csv-mode" .checked=${!c.replace} @change=${() => (this.csv = { ...c, replace: false })}>
               Add new, update matching names</label>
             <label><input type="radio" name="csv-mode" .checked=${c.replace} @change=${() => (this.csv = { ...c, replace: true })}>
@@ -1184,7 +1199,7 @@ export class SettingsPanel extends LitElement {
   /** A row of radio buttons drawn as one pill. */
   #choice<T extends string>(name: string, label: string, options: Option<T>[], current: T, pick: (id: T) => void) {
     return html`
-      <div class="segmented" role="radiogroup" aria-label=${label}>
+      <div class="segmented" role="radiogroup" aria-label=${label} ${segmentedGlass()}>
         ${options.map(o => html`
           <label title=${o.hint ?? nothing}>
             <input type="radio" name=${name} .checked=${o.id === current} @change=${() => pick(o.id)}>
@@ -1556,10 +1571,13 @@ export class SettingsPanel extends LitElement {
             : html`<span class="field-hint">No place picked yet</span>`}
         </div>
         <div class="place-search">
-          <input class="input" type="search" placeholder="Search a town or city" aria-label="Search places"
-                 data-field="weather:search"
-                 @input=${(e: Event) => { this.#placeQuery = this.#value(e); }}
-                 @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); this.#searchPlace(); } }}>
+          <label class="search-field" ${controlGlass('field', this.shown)}>
+            ${icon(Search)}
+            <input type="search" placeholder="Search a town or city" aria-label="Search places"
+                   data-field="weather:search"
+                   @input=${(e: Event) => { this.#placeQuery = this.#value(e); }}
+                   @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); this.#searchPlace(); } }}>
+          </label>
           <button class="btn btn-soft btn-sm ${this.placeBusy ? 'spinning' : ''}" type="button" @click=${this.#searchPlace}>
             ${icon(Search)} Search
           </button>
@@ -1572,7 +1590,7 @@ export class SettingsPanel extends LitElement {
                 <span>${[p.admin1, p.country].filter(Boolean).join(', ')}</span>
               </button>`) : html`<p class="field-hint">No places found.</p>`}
           </div>` : nothing}
-        <div class="segmented" role="radiogroup" aria-label="Units">
+        <div class="segmented" role="radiogroup" aria-label="Units" ${segmentedGlass()}>
           ${(['fahrenheit', 'celsius'] as const).map(u => html`
             <label>
               <input type="radio" name="units" .checked=${weather.units === u}
@@ -2005,17 +2023,27 @@ export class SettingsPanel extends LitElement {
 
       <div class="look-grid">
       <section class="settings-group">
-        <h3 class="field-label">Cards on my page</h3>
+        <div class="settings-group-head">
+          <h3 class="field-label">Cards on my page</h3>
+          ${config.cards.length > 1 ? html`
+            <label class="search-field sm" ${controlGlass('field', this.shown)}>
+              ${icon(Search)}
+              <input type="search" placeholder="Find a card" aria-label="Find a card" .value=${this.cardFilter}
+                     @input=${(e: Event) => (this.cardFilter = (e.target as HTMLInputElement).value)}>
+            </label>` : nothing}
+        </div>
         ${config.cards.length ? html`
           <div class="toggle-list">
-            ${config.cards.map((card, i) => html`
+            ${config.cards.map((card, i) => (card.name.toLowerCase().includes(this.cardFilter.trim().toLowerCase()) ? html`
               <label class="toggle-row">
                 <span class="app-editor-mark" style="--hue:${cardHue(i)}">${card.badge || initials(card.name)}</span>
                 <span class="toggle-name">${card.name}</span>
                 <input class="switch" type="checkbox" .checked=${!prefs.isHidden(card.id)} aria-label="Show ${card.name}"
                        @change=${(e: Event) => transition(() => prefs.setHidden(card.id, !(e.target as HTMLInputElement).checked))}>
-              </label>`)}
-          </div>` : html`<p class="field-hint">No cards yet.</p>`}
+              </label>` : nothing))}
+          </div>
+          ${config.cards.every(c => !c.name.toLowerCase().includes(this.cardFilter.trim().toLowerCase()))
+            ? html`<p class="field-hint">No cards match “${this.cardFilter.trim()}”.</p>` : nothing}` : html`<p class="field-hint">No cards yet.</p>`}
       </section>
 
       <div class="settings-stack">
@@ -2073,11 +2101,17 @@ export class SettingsPanel extends LitElement {
     return html`The first <strong>Save to file</strong> asks you to pick the <code>launchpad.config.js</code> next to <code>index.html</code>.`;
   }
 
-  /** A button that opens a small menu (a popover in the top layer, placed beside it by anchor positioning). */
+  /**
+   * A button that opens a small menu (a popover in the top layer, placed beside it by anchor positioning). In the
+   * glass styles the menu is glass and grows out of its button; `placement: 'up'` is the footer's, whose button
+   * floats in glass too.
+   */
   #menu(id: string, label: unknown, body: unknown, placement: 'down' | 'up' = 'down') {
     return html`
-      <button class="btn btn-ghost btn-sm menu-trigger" type="button" popovertarget="menu-${id}" style="anchor-name: --menu-${id}">${label}</button>
-      <div id="menu-${id}" class="tile-menu settings-menu ${placement}" popover style="position-anchor: --menu-${id}">${body}</div>`;
+      <button class="btn btn-ghost btn-sm menu-trigger" type="button" popovertarget="menu-${id}" style="anchor-name: --menu-${id}"
+              ${placement === 'up' ? controlGlass('button', this.shown) : nothing}>${label}</button>
+      <div id="menu-${id}" class="tile-menu settings-menu ${placement}" popover style="position-anchor: --menu-${id}"
+           ${controlGlass('menu', this.shown)} @beforetoggle=${morphMenu} @toggle=${morphMenu}>${body}</div>`;
   }
 
   #menuItem({ label, glyph, run, hint }: MenuItem) {
@@ -2120,15 +2154,16 @@ export class SettingsPanel extends LitElement {
     };
 
     return html`
-      <dialog class="settings" aria-labelledby="settings-title" @close=${() => previewCss()}
+      <dialog class="settings" aria-labelledby="settings-title" ?data-glass=${glassOn()}
+              @close=${() => { previewCss(); this.shown = false; }}
               @cancel=${this.#onCancel} @pointerdown=${this.#onPointerDown} @click=${this.#onClick}>
         <div class="settings-frame">
           <header class="settings-head">
-            <div>
+            <div class="settings-title">
               <h2 id="settings-title">Settings</h2>
               <p class="settings-sub">${this.#status()}</p>
             </div>
-            <div class="mode-switch" role="tablist" aria-label="Settings mode">
+            <div class="mode-switch" role="tablist" aria-label="Settings mode" ${controlGlass('bar', this.shown)} ${segmentedGlass()}>
               <button type="button" role="tab" aria-selected=${String(!editing)} @click=${() => (this.mode = 'view')}>
                 ${icon(User)} My view
               </button>
@@ -2136,19 +2171,19 @@ export class SettingsPanel extends LitElement {
                 ${icon(Pencil)} Edit page
               </button>
             </div>
-            <button class="icon-btn" type="button" aria-label="Close settings" @click=${this.#requestClose}>${icon(X)}</button>
+            <button class="icon-btn settings-close" type="button" aria-label="Close settings" @click=${this.#requestClose}
+                    ${controlGlass('button', this.shown)}>${icon(X)}</button>
+            ${editing ? html`
+              <nav class="settings-tabs" role="tablist" aria-label="Page settings" ${controlGlass('bar', this.shown)} ${segmentedGlass()}>
+                ${EDIT_TABS.map(t => html`
+                  <button type="button" role="tab" aria-selected=${String(this.tab === t.id)} @click=${() => (this.tab = t.id)}>
+                    ${icon(t.glyph)}<span>${t.label}</span>
+                  </button>`)}
+                <span class="settings-tabs-indicator" aria-hidden="true"></span>
+              </nav>` : nothing}
           </header>
 
           ${this.#banner()}
-
-          ${editing ? html`
-            <nav class="settings-tabs" role="tablist" aria-label="Page settings">
-              ${EDIT_TABS.map(t => html`
-                <button type="button" role="tab" aria-selected=${String(this.tab === t.id)} @click=${() => (this.tab = t.id)}>
-                  ${icon(t.glyph)}<span>${t.label}</span>
-                </button>`)}
-              <span class="settings-tabs-indicator" aria-hidden="true"></span>
-            </nav>` : nothing}
 
           <div class="settings-body" role="tabpanel">${editing ? tabs[this.tab]() : this.#viewMode()}</div>
 
@@ -2157,18 +2192,20 @@ export class SettingsPanel extends LitElement {
               <div class="settings-foot-group">
                 ${this.#menu('file', html`${icon(FolderOpen)} File ${icon(ChevronDown)}`, this.#fileMenu(), 'up')}
               </div>
-              <div class="settings-foot-group">
-                <button class="btn btn-ghost" type="button" @click=${this.#requestClose}>Cancel</button>
-                <button class="btn btn-soft" type="button" title="Apply and keep in this browser" ?disabled=${!this.dirty} @click=${this.#save}>
+              <div class="settings-foot-group settings-actions">
+                <button class="btn btn-ghost" type="button" @click=${this.#requestClose} ${controlGlass('button', this.shown)}>${this.dirty ? 'Cancel' : 'Done'}</button>
+                <button class="btn btn-soft" type="button" title="Apply and keep in this browser" ?disabled=${!this.dirty} @click=${this.#save}
+                        ${controlGlass('button', this.shown)}>
                   ${icon(Check)} Save
                 </button>
                 <button class="btn btn-primary ${this.busy ? 'spinning' : ''}" type="button" title="Write launchpad.config.js"
-                        ?disabled=${(!this.dirty && !config.customized && config.fileLoaded) || this.busy} @click=${this.#saveToFile}>
+                        ?disabled=${(!this.dirty && !config.customized && config.fileLoaded) || this.busy} @click=${this.#saveToFile}
+                        ${controlGlass('button', this.shown)}>
                   ${icon(Save)} Save to file
                 </button>
               </div>` : html`
               <span></span>
-              <button class="btn btn-primary" type="button" @click=${this.#requestClose}>Done</button>`}
+              <button class="btn btn-primary" type="button" @click=${this.#requestClose} ${controlGlass('button', this.shown)}>Done</button>`}
           </footer>
         </div>
         <input class="settings-file" type="file" accept=".js,.json,application/json,text/javascript" hidden @change=${this.#openFile}>

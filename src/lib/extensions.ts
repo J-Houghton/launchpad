@@ -1,12 +1,16 @@
 // src/lib/extensions.ts
 // Extensions: script files next to index.html, listed in the config ("extensions"), that add widgets and
-// backgrounds through window.Launchpad (see the README, and the examples in public/extensions/).
+// backgrounds through window.Launchpad, and can put liquid glass on what they draw (see the README, and the
+// examples in public/extensions/).
 //
 // They're plain scripts rather than modules, so they load from disk too. They run with the page's full
 // trust — which is why they only ever come from files beside it, never from an address or from text in
 // the config. Opening the page with ?safe leaves them all out.
+import type { GlassMotionOptions, GlassParams } from 'liquid-glass-filter';
 import { config, isExtensionPath, isKey, isName } from '../config.js';
 import { safeMode } from './custom-css.js';
+import { Glass, type GlassSetup } from './glass.js';
+import { look } from './look.js';
 import { toast } from './util.js';
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'url' | 'date' | 'datetime' | 'select' | 'checkbox';
@@ -68,6 +72,59 @@ export type BackgroundType = {
 };
 
 export type FileState = { state: 'loading' | 'loaded' | 'failed'; error?: string; adds: string[] };
+
+/** What an extension can ask of its glass (Launchpad.glass). */
+export type GlassOptions = {
+  /** The lens: the package's parameters (its rim, strength, zoom and so on; see LiquidGLass-UI/docs). */
+  lens?: Partial<GlassParams>;
+  /**
+   * Squish on press and stretch along a drag: true for the page's own, or the package's settings (press, drag,
+   * hover, and onFrame to follow along). Less motion turns it off.
+   */
+  motion?: boolean | Pick<GlassMotionOptions, 'press' | 'drag' | 'hover' | 'onFrame'>;
+  /** Light the rim from the page and the pointer, as the page's panels are (the default), or from one side. */
+  light?: boolean;
+};
+
+/** An extension's glass. */
+export type ExtensionGlass = {
+  /** New lens parameters, over the ones it has. Strengths (zoom, bend, light) are cheap enough for every frame. */
+  update(lens: Partial<GlassParams>): void;
+  /** "glass" where the browser draws the lens (Chrome, Edge), "frost" where it can't, "" before it starts. */
+  readonly mode: string;
+  /** Takes the glass off again, as when the widget goes. */
+  destroy(): void;
+};
+
+/**
+ * Liquid glass on an extension's element, drawn and lit as the page's panels are: the element bends what's
+ * behind it, under its own background (the page's CSS gives it the style's light tint, which its own CSS can
+ * override). It follows My view's less motion. Unlike the panels, it's glass in every style.
+ */
+function extensionGlass(el: HTMLElement, options: GlassOptions = {}): ExtensionGlass {
+  if (!(el instanceof HTMLElement)) throw new Error('Launchpad.glass: it needs an element');
+  const params: Partial<GlassParams> = { ...options.lens };
+  const motion = typeof options.motion === 'object' && options.motion ? { ...options.motion } : !!options.motion;
+  const setup = (): GlassSetup => ({ params, motion, light: options.light === false ? false : {}, reducedMotion: look.reducedMotion });
+  const glass = new Glass(el, setup());
+  const sync = () => glass.set(setup());
+  look.addEventListener('change', sync);
+  let gone = false;
+  return Object.freeze({
+    update(lens: Partial<GlassParams>) {
+      if (gone) return;
+      Object.assign(params, lens);
+      void glass.handle?.update(lens);
+    },
+    get mode() { return el.dataset.lens ?? ''; },
+    destroy() {
+      if (gone) return;
+      gone = true;
+      look.removeEventListener('change', sync);
+      glass.destroy();
+    },
+  });
+}
 
 /** Ids the page keeps for itself. */
 const RESERVED_WIDGETS = new Set(['embed', 'data', 'extension']);
@@ -167,9 +224,11 @@ addEventListener('error', e => {
 
 /** The API extensions see, as window.Launchpad. */
 const api = Object.freeze({
-  version: 1,
+  /** 2 added glass. */
+  version: 2,
   widget: blame((type: string, def: WidgetType) => registry.addWidget(type, def)),
   background: blame((id: string, def: BackgroundType) => registry.addBackground(id, def)),
+  glass: (el: HTMLElement, options?: GlassOptions) => extensionGlass(el, options),
   toast: (message: string) => toast(String(message)),
 });
 

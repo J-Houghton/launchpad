@@ -32,7 +32,7 @@ It builds to **one self-contained `index.html`** that runs straight from disk, w
   - **Neon**: a glowing grid at night.
   - **Bold**: chunky borders and hard shadows.
 
-  In Aurora, Liquid and Neon the panels are **liquid glass**: they bend whatever is behind them, catch the light along their edges (from above the page, and from the pointer as it comes near), ease in as they appear, and squish when pressed. This works in Chrome and Edge; other browsers show frosted glass instead. Less motion turns off the easing and the squish, and the light turns at once instead of gliding. The glass redraws whenever anything behind it moves, so to keep these styles smooth, the background moves 30 times a second, and the page's always-moving touches hold still: the drifting glow, the logo's swirl, the greeting's shimmer and the card spotlight.
+  In Aurora, Liquid and Neon the panels are **liquid glass**: they bend whatever is behind them, catch the light along their edges (from above the page, and from the pointer as it comes near, gliding round as it moves), spring into place as they fade in, rise a little under the pointer, and squish when pressed (and stretch as you drag across them). Settings follows Apple's Liquid Glass: the sheet itself stays plain, and its controls float over it in glass. The header and footer stay put while the settings scroll under them. In a row of choices, the selection lifts into a lens you can drag along the row. Switches, and the colour picker's hue, have knobs that turn into clear lenses while you hold them. Search fields are glass too, and menus grow out of the buttons that open them. With nothing to save, the footer's buttons merge into **Done**; make a change and they part from it. This works in Chrome and Edge; other browsers show frosted glass instead. Less motion turns all of that off, and the light turns at once instead of gliding. The glass redraws whenever anything behind it moves, so to keep these styles smooth, the background moves 30 times a second, and the page's always-moving touches hold still: the drifting glow, the logo's swirl, the greeting's shimmer and the card spotlight.
 
   Behind the page there can be drifting particles, the style's backdrop alone, or a plain colour. Each style comes with a few colour combos to pick from, and any of its six colours (background, panels, text and three accents) can be fine-tuned. Every style keeps its own colours, and its glow, borders and particles follow them. Pick a look in Settings → My view; **Make it everyone's** turns yours into the page's own.
 - **My view**: personal choices stay in your browser and never change the page for anyone else. These are your look and colours, less motion, hidden cards and pins.
@@ -234,7 +234,7 @@ Rebuilding replaces `dist/launchpad.config.js` with the one from `public/`. Copy
 
 Extensions are plain script files beside `index.html` that add kinds of widget and backgrounds. List them under Settings → Edit page → Page → **Extensions**, or in `"extensions"` in `launchpad.config.js`. Their widgets then appear under **Add a widget**, and their backgrounds in My view.
 
-Four examples come in the `extensions` folder, and Settings can add each one with a click:
+Five examples come in the `extensions` folder, and Settings can add each one with a click:
 
 | File | Adds |
 | --- | --- |
@@ -242,6 +242,7 @@ Four examples come in the `extensions` folder, and Settings can add each one wit
 | `extensions/countdown.js` | a **Countdown** widget: days, hours and minutes to a date |
 | `extensions/search.js` | a **Search box** for the web, Wikipedia or your own site. It has no panel of its own, so it can stand in for the greeting. Press <kbd>/</kbd> to jump to it |
 | `extensions/starfield.js` | a **Starfield** background, in the style's own colours |
+| `extensions/lens.js` | a **Glass lens** widget: a lens of liquid glass to pick up and drag about the page. It bends and magnifies whatever is under it, and stays where you leave it |
 
 An extension runs with full access to the page, so:
 
@@ -276,6 +277,12 @@ Launchpad.widget('hello', {
   - `setup({ width, height })` runs at the start and whenever the page is resized.
   - `draw(context, frame)` draws one frame. `frame` has `width`, `height`, `time`, `dt` (1 at 60 frames a second), `pointer` (`{ x, y }` or `null`), `colors` (`particle`, `accent`, `accent2`, `accent3`, `ink`, `muted`, `bg`) and `still`.
   - The built-in particles are registered the same way: see `src/backgrounds/particles.ts`.
+- **`Launchpad.glass(element, { lens?, motion?, light? })`** puts liquid glass on an element your extension drew. It's drawn and lit like the page's panels, in every style (Chrome and Edge draw the lens; other browsers show frosted glass).
+  - `lens` takes [liquid-glass-filter](https://github.com/J-Houghton/LiquidGLass-UI)'s parameters, such as `{ bezelWidth: 26, displacementScale: 40, magnify: 24 }`.
+  - `motion: true` gives it the panels' squish. Or pass the package's motion settings (`press`, `drag`, `hover`, and `onFrame` to follow along). Less motion turns it off.
+  - `light: false` lights it from one side instead of from the page and the pointer.
+  - It returns `{ update(lens), mode, destroy() }`. `mode` is `"glass"` or `"frost"`. Call `destroy()` when your widget tidies up. The glass lens example uses all of it.
+  - It's new in version 2 of the API (`Launchpad.version`).
 - **`Launchpad.toast(message)`** shows a short message.
 
 Style your widgets with the page's CSS variables (see Custom CSS above), and they'll suit every style. The examples show how. Settings → Edit page → Page → Extensions shows what each file added, or why it didn't load.
