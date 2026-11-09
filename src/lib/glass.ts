@@ -1,33 +1,34 @@
 // src/lib/glass.ts
-// Liquid glass on Launchpad's panels, from the liquid-glass-filter package (its guide: LiquidGLass-UI/docs).
-// The package makes the lens, an SVG filter that refracts whatever is behind a panel; Launchpad's CSS keeps
-// the look. Each glass gets --lens (the backdrop-filter that draws the lens) and data-lens: "glass" where the
-// browser can draw it (Chrome, Edge), "frost" where it can't (Safari, Firefox), which keep the frosted glass
-// Launchpad already has. The filters live in one holder at the end of the page, so nothing is added inside
-// the panels themselves, which Lit and extensions render.
+// Liquid glass, from the liquid-glass-filter package (its guide: LiquidGLass-UI/docs). As Apple's guidelines have
+// it, the glass is for what floats over the page and is used: the header's controls, the search box, menus,
+// buttons and the like (lib/glass-controls.ts), never the cards and widgets themselves, which keep the style's
+// frosted panels. The package makes the lens, an SVG filter that refracts whatever is behind an element;
+// Launchpad's CSS keeps the look. Each glass gets --lens (the backdrop-filter that draws the lens) and data-lens:
+// "glass" where the browser can draw it (Chrome, Edge), "frost" where it can't (Safari, Firefox). The filters
+// live in one holder at the end of the page, so nothing is added inside the elements themselves, which Lit and
+// extensions render.
 import { nothing } from 'lit';
 import { AsyncDirective, PartType, directive, type ElementPart, type PartInfo } from 'lit/async-directive.js';
+import type { Style } from '../config.js';
 import {
   attachGlassLight, attachGlassMotion, attachLiquidGlass,
   type GlassLightHandle, type GlassLightOptions, type GlassMotionHandle, type GlassMotionOptions, type GlassParams,
   type LiquidGlassHandle,
 } from 'liquid-glass-filter';
 
+/** The styles drawn in liquid glass. The rest keep frosted (or solid) controls. */
+export const GLASS_STYLES: readonly Style[] = ['aurora', 'liquid', 'neon'];
+
 export type GlassSetup = {
   /** The lens itself: its rim, strength, shading and so on (the package's parameters). */
   params?: Partial<GlassParams>;
-  /** Let the package style the panel (its own tint and backdrop) in place of Launchpad's colours. */
+  /** Let the package style the element (its own tint and backdrop) in place of Launchpad's colours. */
   ownStyles?: boolean;
   /** Draw it as a browser that can't draw the lens would ('frost'), or as one that can ('full'). */
   support?: 'full' | 'frost';
   /**
-   * Ease the lens in over this many milliseconds when it first appears, as the element fades in (its `enter`
-   * animation); with `motion`, the glass springs into place as it does.
-   */
-  appear?: number;
-  /**
-   * Squish on press, stretch along a drag, rise a little under the pointer, and spring in on arrival; or the
-   * package's motion settings, for glass of its own (an extension's, see lib/extensions.ts).
+   * Squish on press, stretch along a drag and rise a little under the pointer; or the package's motion settings
+   * (the controls' own, lib/glass-controls.ts, or an extension's, lib/extensions.ts).
    */
   motion?: boolean | GlassMotionOptions;
   /**
@@ -42,7 +43,9 @@ export type GlassSetup = {
    */
   mapPixels?: number;
   mapScale?: number;
-  /** From My view: less motion (no easing in, no squish), and frostier, higher-contrast glass. */
+  /** How wide the lit rim is, CSS px (the package's rimPx, 2 unless given): a small control's is narrower. */
+  rimPx?: number;
+  /** From My view: less motion (no squish, and the light turns at once), and frostier, higher-contrast glass. */
   reducedMotion?: boolean;
   reducedTransparency?: boolean | 'auto';
 };
@@ -51,22 +54,22 @@ export type GlassSetup = {
 export const glasses = new Set<Glass>();
 
 /**
- * Under the pointer, a glass rises this many px along its longer side, so a wide card lifts as much as a small
- * widget does, on a spring with a little overshoot.
+ * Under the pointer, a glass rises this many px along its longer side, so a wide one lifts as much as a small one
+ * does, on a spring with a little overshoot.
  */
 const RISE_PX = 8;
 const RISE_SPRING = { duration: 0.45, bounce: 0.25 };
 /**
  * Pressed and dragged across, a glass stretches with the pointer's speed: by at most this many px along its
- * longer side (the package's 12 % alone would swing a page-wide card 70 px about), and leans by at most this
- * many px at its top and bottom.
+ * longer side (the package's 12 % alone would swing a page-wide one 70 px about), and leans by at most this many
+ * px at its top and bottom.
  */
 const STRETCH_PX = 40;
 const LEAN_PX = 12;
 
 let holder: HTMLElement | undefined;
 
-/** Where the lenses' SVG filters live: an empty corner of the page, in the same document as the panels. */
+/** Where the lenses' SVG filters live: an empty corner of the page, in the same document as the glass. */
 export function lensHolder() {
   if (!holder) {
     holder = document.createElement('div');
@@ -89,13 +92,10 @@ export class Glass {
   #how = '';
   #params = '';
   #lit = '';
-  #started = false;
-  /** Stops waiting for the element's fade-in (see #arrive). */
-  #unwait?: () => void;
 
   /**
    * Lenses waiting to start: a couple each frame, and only once their element is on the page (the lens is cut
-   * to its size and corners). A page full of panels then never holds up a paint, and its lenses ease in in turn.
+   * to its size and corners). A page with a lot of glass then never holds up a paint.
    */
   static #queue = new Set<Glass>();
   static #frame = 0;
@@ -128,7 +128,7 @@ export class Glass {
   /** New settings. The lens updates in place, or starts over if how it's attached has changed. */
   set(setup: GlassSetup) {
     this.#setup = setup;
-    const how = JSON.stringify([setup.ownStyles, setup.support, setup.reducedTransparency, setup.mapPixels, setup.mapScale]);
+    const how = JSON.stringify([setup.ownStyles, setup.support, setup.reducedTransparency, setup.mapPixels, setup.mapScale, setup.rimPx]);
     if ((this.#handle || Glass.#queue.has(this)) && how === this.#how) {
       this.#update();
       this.#move();
@@ -171,60 +171,22 @@ export class Glass {
     const s = this.#setup;
     const own = !!s.ownStyles;
     const params = this.#lensParams();
-    // only a new lens arrives, not one that's starting over with new settings
-    const arriving = !!s.appear && !s.reducedMotion && !this.#started;
     this.#params = JSON.stringify(params);
     this.#handle = attachLiquidGlass(this.element, {
       ...params,
       applyStyles: own,
-      // the light on its own layer, the panel's ::before (see #paint), so the lens has less to redo
+      // the light on its own layer, the element's ::before (see #paint), so the lens has less to redo
       lightLayer: !own,
       support: s.support,
       ...(s.mapPixels ? { maxMapPixels: s.mapPixels } : {}),
       ...(s.mapScale ? { dpr: s.mapScale } : {}),
+      ...(s.rimPx ? { rimPx: s.rimPx } : {}),
       mount: lensHolder(),
       reducedTransparency: s.reducedTransparency ?? 'auto',
-      // flat until it arrives
-      ...(arriving ? { intensity: 0 } : {}),
       onRender: handle => this.#paint(handle),
     });
-    this.#started = true;
     this.#move();
     this.#aim();
-    if (arriving) this.#arrive(this.#handle, s.appear!);
-  }
-
-  /**
-   * A new panel's arrival: as it fades in (its `enter` animation, staggered down the page), its lens eases in
-   * and the glass springs into place, so the three read as one. Lenses often start before their panel's turn
-   * comes, so they wait for it. A panel that isn't fading in (the style changed under it), or is well into it,
-   * just eases its lens in: springing then would show it jump smaller first.
-   */
-  #arrive(handle: LiquidGlassHandle, ms: number) {
-    const fade = this.element.getAnimations().find(a => (a as CSSAnimation).animationName === 'enter');
-    const go = (spring: boolean) => {
-      this.#unwait?.();
-      if (this.#handle !== handle) return;
-      void handle.appear(ms);
-      if (spring) this.#motion?.enter();
-    };
-    const timing = fade?.effect?.getComputedTiming();
-    const into = fade?.playState === 'running' ? Number(fade.currentTime) - Number(timing?.delay ?? 0) : Infinity;
-    if (into > 120) return go(false);
-    if (into >= 0) return go(true);
-    // before its turn: go when the fade starts, or straight away if it's called off (arranging stops it)
-    const el = this.element;
-    const started = (e: AnimationEvent) => e.target === el && e.animationName === 'enter' && go(true);
-    const cancelled = (e: AnimationEvent) => e.target === el && e.animationName === 'enter' && go(false);
-    const late = setTimeout(() => go(false), -into + 1000);
-    el.addEventListener('animationstart', started);
-    el.addEventListener('animationcancel', cancelled);
-    this.#unwait = () => {
-      el.removeEventListener('animationstart', started);
-      el.removeEventListener('animationcancel', cancelled);
-      clearTimeout(late);
-      this.#unwait = undefined;
-    };
   }
 
   /** Squish, rise and stretch, or not: it comes and goes without touching the lens. */
@@ -259,7 +221,7 @@ export class Glass {
 
   /**
    * After each render: tell the CSS which way it's drawn, and hand it the lens, and the lens's light: its
-   * shading and its lit rim, which the panel's ::before draws (styles/glass.css). In the lens's own filter, the
+   * shading and its lit rim, which the element's ::before draws (styles/glass.css). In the lens's own filter, the
    * light would be redone over the backdrop on every frame the lens is redrawn, which made a page of glass three
    * times slower; on its own layer it's only redrawn when the light moves.
    */
@@ -282,7 +244,6 @@ export class Glass {
 
   #stop() {
     Glass.#queue.delete(this);
-    this.#unwait?.();
     this.#light?.destroy();
     this.#motion?.destroy();
     this.#handle?.destroy();

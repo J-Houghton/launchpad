@@ -6,6 +6,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { config, type TileRef } from '../config.js';
 import { prefs } from '../lib/prefs.js';
 import { health, healthLabel } from '../lib/health.js';
+import { controlGlass, morphFrom } from '../lib/glass-controls.js';
 import { StoreController } from '../lib/store-controller.js';
 import { transition, vtName } from '../lib/transition.js';
 import { ArrowRight, Copy, ExternalLink, Link, Pin, PinOff, RefreshCw, icon, type IconNode } from '../lib/icons.js';
@@ -79,6 +80,8 @@ export class TileMenu extends LitElement {
     if (anchored) anchor.style.setProperty('anchor-name', '--tile-menu-anchor');
     menu.showPopover();
     if (!anchored) this.#placeAt(point ?? this.#below(anchor));
+    // in the glass styles, it grows out of its button (or the point it was asked for at)
+    morphFrom(menu, point ? new DOMRect(point.x, point.y, 1, 1) : anchor.getBoundingClientRect());
     menu.querySelector<HTMLElement>('.menu-item')?.focus();
   }
 
@@ -181,7 +184,7 @@ export class TileMenu extends LitElement {
     return html`
       <div class="tile-menu" popover role="dialog"
            aria-label=${ref ? `${title!.primary} ${ref.tile.label} actions`.replace(/\s+/g, ' ') : 'Link actions'}
-           @keydown=${this.#onKeyDown} @beforetoggle=${this.#onBeforeToggle} @toggle=${this.#onToggle}>
+           @keydown=${this.#onKeyDown} @beforetoggle=${this.#onBeforeToggle} @toggle=${this.#onToggle} ${controlGlass('menu')}>
         ${ref ? this.#body(ref) : nothing}
       </div>
     `;

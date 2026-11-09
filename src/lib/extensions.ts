@@ -9,7 +9,7 @@
 import type { GlassMotionOptions, GlassParams } from 'liquid-glass-filter';
 import { config, isExtensionPath, isKey, isName } from '../config.js';
 import { safeMode } from './custom-css.js';
-import { Glass, type GlassSetup } from './glass.js';
+import { GLASS_STYLES, Glass, type GlassSetup } from './glass.js';
 import { look } from './look.js';
 import { toast } from './util.js';
 
@@ -82,8 +82,15 @@ export type GlassOptions = {
    * hover, and onFrame to follow along). Less motion turns it off.
    */
   motion?: boolean | Pick<GlassMotionOptions, 'press' | 'drag' | 'hover' | 'onFrame'>;
-  /** Light the rim from the page and the pointer, as the page's panels are (the default), or from one side. */
+  /** Light the rim from the page and the pointer, as the page's own glass is (the default), or from one side. */
   light?: boolean;
+  /** How wide the lit rim is, CSS px: 2 by default; the page's own controls have 1. */
+  rim?: number;
+  /**
+   * Glass in every style. By default it's glass in the styles drawn in glass (Aurora, Liquid and Neon), as the
+   * page's own controls are, and the element keeps its own look in the rest.
+   */
+  always?: boolean;
 };
 
 /** An extension's glass. */
@@ -97,31 +104,42 @@ export type ExtensionGlass = {
 };
 
 /**
- * Liquid glass on an extension's element, drawn and lit as the page's panels are: the element bends what's
+ * Liquid glass on an extension's element, drawn and lit as the page's own glass is: the element bends what's
  * behind it, under its own background (the page's CSS gives it the style's light tint, which its own CSS can
- * override). It follows My view's less motion. Unlike the panels, it's glass in every style.
+ * override). It follows the page's style (see `always`) and My view's less motion.
  */
 function extensionGlass(el: HTMLElement, options: GlassOptions = {}): ExtensionGlass {
   if (!(el instanceof HTMLElement)) throw new Error('Launchpad.glass: it needs an element');
   const params: Partial<GlassParams> = { ...options.lens };
   const motion = typeof options.motion === 'object' && options.motion ? { ...options.motion } : !!options.motion;
-  const setup = (): GlassSetup => ({ params, motion, light: options.light === false ? false : {}, reducedMotion: look.reducedMotion });
-  const glass = new Glass(el, setup());
-  const sync = () => glass.set(setup());
+  const rim = Number(options.rim) > 0 ? Number(options.rim) : undefined;
+  const setup = (): GlassSetup => ({ params, motion, rimPx: rim, light: options.light === false ? false : {}, reducedMotion: look.reducedMotion });
+  let glass: Glass | undefined;
+  const sync = () => {
+    const on = !!options.always || GLASS_STYLES.includes(look.style);
+    if (on && glass) glass.set(setup());
+    else if (on) glass = new Glass(el, setup());
+    else {
+      glass?.destroy();
+      glass = undefined;
+    }
+  };
+  sync();
   look.addEventListener('change', sync);
   let gone = false;
   return Object.freeze({
     update(lens: Partial<GlassParams>) {
       if (gone) return;
       Object.assign(params, lens);
-      void glass.handle?.update(lens);
+      void glass?.handle?.update(lens);
     },
     get mode() { return el.dataset.lens ?? ''; },
     destroy() {
       if (gone) return;
       gone = true;
       look.removeEventListener('change', sync);
-      glass.destroy();
+      glass?.destroy();
+      glass = undefined;
     },
   });
 }

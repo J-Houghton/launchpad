@@ -22,7 +22,6 @@ import { safeMode } from './lib/custom-css.js';
 import { startExtensions } from './lib/extensions.js';
 import { health } from './lib/health.js';
 import { look } from './lib/look.js';
-import { panelGlass } from './lib/panel-glass.js';
 import { layoutStyle, moveAmong, place } from './lib/layout.js';
 import type { SortMove } from './lib/sortable.js';
 import { StoreController } from './lib/store-controller.js';
@@ -49,16 +48,16 @@ export class AppShell extends LitElement {
   #content(id: SectionId) {
     switch (id) {
       case 'greeting': return html`<hero-section></hero-section>`;
-      case 'clock': return html`<clock-widget class="widget glass enter" style="--i:3" ${panelGlass()}></clock-widget>`;
-      case 'weather': return html`<weather-widget class="widget glass enter" style="--i:4" ${panelGlass()}></weather-widget>`;
+      case 'clock': return html`<clock-widget class="widget glass enter" style="--i:3"></clock-widget>`;
+      case 'weather': return html`<weather-widget class="widget glass enter" style="--i:4"></weather-widget>`;
       case 'pinned': return html`<quick-dock kind="pinned"></quick-dock>`;
       case 'recent': return html`<quick-dock kind="recent"></quick-dock>`;
       case 'cards': return html`<app-main></app-main>`;
     }
     const added = config.widgets.added.find(w => w.id === id);
-    if (added?.type === 'embed') return html`<embed-widget class="widget glass enter" style="--i:5" .widget=${added} ${panelGlass()}></embed-widget>`;
-    if (added?.type === 'data') return html`<data-widget class="widget glass enter" style="--i:5" .widget=${added} ${panelGlass()}></data-widget>`;
-    if (added?.type === 'extension') return html`<extension-widget class="widget glass enter" style="--i:5" .widget=${added} ${panelGlass()}></extension-widget>`;
+    if (added?.type === 'embed') return html`<embed-widget class="widget glass enter" style="--i:5" .widget=${added}></embed-widget>`;
+    if (added?.type === 'data') return html`<data-widget class="widget glass enter" style="--i:5" .widget=${added}></data-widget>`;
+    if (added?.type === 'extension') return html`<extension-widget class="widget glass enter" style="--i:5" .widget=${added}></extension-widget>`;
     return nothing;
   }
 

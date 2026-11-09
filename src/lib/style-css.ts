@@ -6,7 +6,7 @@
 import type { Style, StyleColors } from '../config.js';
 import { toHex } from './colors.js';
 import { ownHues } from './combos.js';
-import { GLASS_STYLES } from './panel-glass.js';
+import { GLASS_STYLES } from './glass.js';
 
 const COLOURS: [string, string][] = [
   ['--bg', 'behind everything'], ['--panel', 'cards and panels'], ['--ink', 'text'], ['--muted', 'softer text'],

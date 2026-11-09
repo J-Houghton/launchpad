@@ -1,10 +1,12 @@
 // src/lib/glass-controls.ts
-// Settings in liquid glass, in the styles drawn with it (Aurora, Liquid and Neon), after Apple's Liquid Glass
-// and kube.io's components (kube.io/blog/liquid-glass-css-svg). As Apple has it, the sheet and what's written
-// on it aren't glass; the controls are, floating over it:
-//   controlGlass()    buttons, search fields, the bars a row of choices sits in, and menus: each glass of its own;
-//                     a button swells and squishes under the pointer. A menu morphs out of the button that opens
-//                     it (morphMenu).
+// Launchpad's controls in liquid glass, in the styles drawn with it (Aurora, Liquid and Neon), after Apple's
+// Liquid Glass guidelines and kube.io's components (kube.io/blog/liquid-glass-css-svg). As Apple has it, glass is
+// for the layer of controls that floats over the content, used sparingly; the content itself (the cards, the
+// widgets, Settings' sheet) isn't glass:
+//   controlGlass()    buttons, search fields, the bars a group of controls sits in (the header's links, a row of
+//                     choices, the arranging toolbar), and menus: each glass of its own; a button swells and
+//                     squishes under the pointer. A menu grows out of the button that opens it (morphMenu,
+//                     morphFrom), and a toast is glass too (glassToast).
 //   segmentedGlass()  a row of choices, whose selection is a solid pill that lifts into a clear lens while it's
 //                     held, slides along the choices under the pointer, and drops onto the one it's let go on.
 //   glassSwitches()   switches whose thumb, held, swells into a clear lens over the track and can be slid
@@ -19,9 +21,8 @@ import {
   type GlassFilterHandle, type GlassMotionOptions, type GlassParams, type SpringConfig, type SpringPhysics,
   type SpringState,
 } from 'liquid-glass-filter';
-import { Glass, lensHolder, type GlassSetup } from './glass.js';
+import { GLASS_STYLES, Glass, lensHolder, type GlassSetup } from './glass.js';
 import { look } from './look.js';
-import { GLASS_STYLES } from './panel-glass.js';
 
 /** Whether the page's style is drawn in glass. */
 export const glassOn = () => GLASS_STYLES.includes(look.style);
@@ -99,6 +100,11 @@ const FIELD_MOTION: GlassMotionOptions = { press: { scale: 0.985, dim: 1, spring
 
 /** Maps are small for these: a control is small, and its rim smooth. */
 const CONTROL_MAP_PIXELS = 12_000;
+/**
+ * The lit rim of a control, CSS px: a fine bright edge, as Apple's controls have. The package's 2 suits a lens a
+ * few hundred px across; on a control 36 px high it reads as a thick outline.
+ */
+const CONTROL_RIM = 1;
 
 class ControlGlassDirective extends AsyncDirective {
   #element?: HTMLElement;
@@ -137,6 +143,7 @@ class ControlGlassDirective extends AsyncDirective {
     return {
       params: { button: BUTTON, field: FIELD, bar: BAR, menu: MENU }[kind],
       mapPixels: CONTROL_MAP_PIXELS,
+      rimPx: CONTROL_RIM,
       light: {},
       motion: { button: BUTTON_MOTION, field: FIELD_MOTION, bar: false, menu: false }[kind],
       reducedMotion: look.reducedMotion,
@@ -178,8 +185,7 @@ const MORPH = springLinearEasing({ duration: 0.45, bounce: 0.22 });
 
 /**
  * For a popover's `beforetoggle` and `toggle` events: as it opens, it morphs out of the button that opened it (the
- * one whose popovertarget names it), growing from that button's size and place to its own, and its items fade in
- * once it has room for them. In the styles with glass, and with motion.
+ * one whose popovertarget names it). See morphFrom.
  */
 export function morphMenu(e: Event) {
   const menu = e.currentTarget as HTMLElement;
@@ -192,14 +198,23 @@ export function morphMenu(e: Event) {
   menu.style.visibility = '';
   if (!morph) return;
   const trigger = menu.ownerDocument.querySelector<HTMLElement>(`[popovertarget="${CSS.escape(menu.id)}"]`);
-  if (!trigger) return;
-  const from = trigger.getBoundingClientRect();
+  if (trigger) morphFrom(menu, trigger.getBoundingClientRect(), parseFloat(getComputedStyle(trigger).borderTopLeftRadius) || 0);
+}
+
+/**
+ * A menu (or anything that's just appeared) grows out of the button that opened it, as Apple's buttons morph into
+ * their menus: from the button's size and place (`from`, with its corner `radius`; a round button's by default) to
+ * its own, settling with a little bounce, and its items fade in once it has room for them. In the styles with
+ * glass, and with motion; call it as it's shown.
+ */
+export function morphFrom(menu: HTMLElement, from: DOMRect, radius = Math.min(from.width, from.height) / 2) {
+  if (!glassOn() || look.reducedMotion) return;
   const to = menu.getBoundingClientRect();
   if (!to.width || !to.height) return;
   const sx = from.width / to.width;
   const sy = from.height / to.height;
   // the button's corners, as they'd be drawn scaled up to the menu's size
-  const r = Math.min(parseFloat(getComputedStyle(trigger).borderTopLeftRadius) || 0, from.height / 2, from.width / 2);
+  const r = Math.min(radius, from.height / 2, from.width / 2);
   menu.animate([
     {
       transformOrigin: '0 0',
@@ -210,6 +225,27 @@ export function morphMenu(e: Event) {
   ], { duration: MORPH.durationMs, easing: MORPH.easing });
   for (const item of menu.children) {
     (item as HTMLElement).animate([{ opacity: 0 }, { opacity: 0, offset: 0.35 }, { opacity: 1 }], { duration: Math.min(400, MORPH.durationMs) });
+  }
+}
+
+/** A toast floats over the page, so in the glass styles it's glass: a frosty one, so its words read over anything. */
+const TOAST: Partial<GlassParams> = { bezelWidth: 14, displacementScale: 36, shade: 0.25, specularStrength: 1, blur: 3, blurStage: 'before' };
+let toastGlass: { el: HTMLElement; glass?: Glass } | undefined;
+
+/** Glass on the toast (lib/util.ts), as the page's style comes and goes. */
+export function glassToast(el: HTMLElement) {
+  if (!toastGlass) {
+    const state: { el: HTMLElement; glass?: Glass } = { el };
+    toastGlass = state;
+    const sync = () => {
+      if (glassOn()) state.glass ??= new Glass(el, { params: TOAST, mapPixels: CONTROL_MAP_PIXELS, rimPx: CONTROL_RIM, light: {} });
+      else {
+        state.glass?.destroy();
+        state.glass = undefined;
+      }
+    };
+    look.addEventListener('change', sync);
+    sync();
   }
 }
 
@@ -344,7 +380,7 @@ class Segmented {
     this.#box.lensWidth = widest + DROP_PAD * 2;
     this.#lens.style.width = `${this.#box.lensWidth}px`;
     this.#lens.style.height = `${this.#box.height + DROP_PAD * 2}px`;
-    this.#glass = new Glass(this.#lens, { params: DROP, light: {}, mapPixels: 6000 });
+    this.#glass = new Glass(this.#lens, { params: DROP, light: {}, mapPixels: 6000, rimPx: CONTROL_RIM });
   }
 
   #move = (e: PointerEvent) => {
@@ -504,7 +540,7 @@ const THUMB_SLIDE: SpringConfig = { duration: 0.3, bounce: 0.18 };
 const THUMB_GIVE = 1 / 22;
 
 let thumbLens: GlassFilterHandle | undefined;
-const thumbFilter = () => (thumbLens ??= createGlassFilter(lensHolder(), { ...THUMB, maxMapPixels: 8000 }));
+const thumbFilter = () => (thumbLens ??= createGlassFilter(lensHolder(), { ...THUMB, maxMapPixels: 8000, rimPx: CONTROL_RIM }));
 
 class SwitchMotion {
   readonly input: HTMLInputElement;
@@ -710,7 +746,7 @@ class GlassSlider {
   #down = (e: PointerEvent) => {
     if (e.button !== 0 || !this.#on || look.reducedMotion) return;
     // glass from the first time it's held: a picker that's never used costs nothing
-    this.#glass ??= new Glass(this.#knob, { params: KNOB, light: {}, mapPixels: 4000 });
+    this.#glass ??= new Glass(this.#knob, { params: KNOB, light: {}, mapPixels: 4000, rimPx: CONTROL_RIM });
     this.#held = true;
     this.#scale.to = 1;
     this.#clear.to = 1;

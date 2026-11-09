@@ -145,6 +145,9 @@
       let zoom = restZoom;
 
       const glass = Launchpad.glass(lens, {
+        // a lens is glass in every style, with a fine rim
+        always: true,
+        rim: 1.5,
         lens: {
           bezelWidth: 26, displacementScale: 40, shade: 0.08, specularStrength: 1.1, blur: 0, magnify: restZoom,
         },

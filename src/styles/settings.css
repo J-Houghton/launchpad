@@ -2095,13 +2095,6 @@ SETTINGS — modal dialog, form controls
         pointer-events: none;
     }
 
-    .tile-menu[data-lens="glass"] {
-        -webkit-backdrop-filter: var(--lens);
-        backdrop-filter: var(--lens);
-        background: color-mix(in oklab, var(--panel) 45%, transparent);
-        border-color: var(--glass-border);
-    }
-
     /* ---- search fields: a pill of glass that swells a little as it's typed in (kube.io's search box) ---- */
     .search-field {
         display: inline-flex;

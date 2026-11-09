@@ -1,5 +1,6 @@
 // src/lib/util.ts
 import { html, render } from 'lit';
+import { glassToast } from './glass-controls.js';
 import { Check, TriangleAlert, icon } from './icons';
 
 /** "Billing Service" → "BS", "CRM" → "CRM", "Storefront" → "ST" */
@@ -53,6 +54,7 @@ export function toast(message: string, kind: 'ok' | 'error' = 'ok') {
   toastEl.dataset.kind = kind;
   render(html`${icon(kind === 'ok' ? Check : TriangleAlert)}<span>${message}</span>`, toastEl);
   if (!toastEl.matches(':popover-open')) toastEl.showPopover();
+  glassToast(toastEl);
   clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => toastEl?.hidePopover(), kind === 'ok' ? 2200 : 4000);
 }
