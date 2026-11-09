@@ -65,6 +65,7 @@ class PanelGlassDirective extends AsyncDirective {
     return {
       params: this.#kind === 'drop' ? DROP : LENS,
       mapPixels: MAP_PIXELS,
+      light: {},
       appear: panel ? 450 : undefined,
       motion: panel && !arrange.active,
       reducedMotion: look.reducedMotion,

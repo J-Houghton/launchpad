@@ -8,8 +8,8 @@
 import { nothing } from 'lit';
 import { AsyncDirective, PartType, directive, type ElementPart, type PartInfo } from 'lit/async-directive.js';
 import {
-  attachGlassMotion, attachLiquidGlass, displacementCurve, displacementMap, maxAbs,
-  type GlassMotionHandle, type GlassParams, type LiquidGlassHandle, type ResolvedGlassParams,
+  attachGlassLight, attachGlassMotion, attachLiquidGlass,
+  type GlassLightHandle, type GlassLightOptions, type GlassMotionHandle, type GlassParams, type LiquidGlassHandle,
 } from 'liquid-glass-filter';
 
 export type GlassSetup = {
@@ -24,6 +24,11 @@ export type GlassSetup = {
   /** Squish on press, and stretch along a drag. */
   motion?: boolean;
   /**
+   * Light the rim from the page (the package's scene light, above the top of the window, so every glass is lit
+   * from the same place) and from the pointer as it comes near; or leave it lit from one fixed direction.
+   */
+  light?: GlassLightOptions | false;
+  /**
    * The size of the lens's map, which the browser draws on every frame the lens is redrawn: most of what a lens
    * costs. Its pixels at most, and the scale it's made at (else the screen's). The lens stretches it to fit,
    * and since it only moves the backdrop about smoothly, a small one looks much the same.
@@ -37,57 +42,6 @@ export type GlassSetup = {
 
 /** Every glass on the page now. */
 export const glasses = new Set<Glass>();
-
-/**
- * A lens's shading and rim light, drawn once into an image instead of by its filter on every frame. They depend
- * only on the shape, and taking them out of the filter halves what a lens costs to redraw. They're made with the
- * package's own engine at the element's full size and the screen's scale, so the rim stays crisp however small
- * the lens's map is. The engine bakes them into a map's blue channel (light above 128, shade below); here they
- * become white and black, see-through by as much as the filter would have blended them in, which, laid over the
- * lens, comes to the same thing. Shared by every lens of the same shape, and let go when none uses it.
- */
-const lights = new Map<string, { url: Promise<string>; users: number }>();
-
-function takeLight(p: ResolvedGlassParams, shade: number, rim: number) {
-  const scale = Math.min(devicePixelRatio || 1, 2);
-  const [width, height] = [Math.round(p.width), Math.round(p.height)];
-  const key = [width, height, p.radius, p.bezelWidth, p.surface, p.glassThickness, p.refractiveIndex, p.specularAngleDeg, scale, shade, rim].join(' ');
-  let light = lights.get(key);
-  if (!light) lights.set(key, (light = { url: paintLight({ ...p, width, height }, scale, shade, rim), users: 0 }));
-  light.users++;
-  return { key, url: light.url };
-}
-
-function dropLight(key: string) {
-  const light = lights.get(key);
-  if (!light || --light.users > 0) return;
-  lights.delete(key);
-  void light.url.then(url => URL.revokeObjectURL(url), () => {});
-}
-
-async function paintLight(p: ResolvedGlassParams, scale: number, shade: number, rim: number) {
-  await new Promise(done => setTimeout(done)); // after the frame that asked for it
-  const curve = displacementCurve({
-    glassThickness: p.glassThickness, bezelWidth: p.bezelWidth, refractiveIndex: p.refractiveIndex, surface: p.surface,
-  });
-  const map = displacementMap({
-    width: p.width, height: p.height, radius: p.radius, bezelWidth: p.bezelWidth, dpr: scale,
-    curve, maxDisplacement: maxAbs(curve), rim: { angleDeg: p.specularAngleDeg, rimPx: 2 },
-  });
-  const image = new ImageData(map.width, map.height);
-  const [from, px] = [map.data, image.data];
-  for (let i = 0; i < px.length; i += 4) {
-    const b = from[i + 2];
-    const lit = b > 128;
-    px[i] = px[i + 1] = px[i + 2] = lit ? 255 : 0;
-    px[i + 3] = Math.round(255 * Math.min(1, lit ? ((b - 128) / 127) * rim : ((128 - b) / 128) * shade));
-  }
-  const canvas = Object.assign(document.createElement('canvas'), { width: map.width, height: map.height });
-  canvas.getContext('2d')!.putImageData(image, 0, 0);
-  const blob = await new Promise<Blob | null>(done => canvas.toBlob(done));
-  if (!blob) throw new Error('Couldn\'t draw the lens\'s light');
-  return URL.createObjectURL(blob);
-}
 
 let holder: HTMLElement | undefined;
 
@@ -109,13 +63,12 @@ export class Glass {
   #setup: GlassSetup = {};
   #handle?: LiquidGlassHandle;
   #motion?: GlassMotionHandle;
-  /** How the lens was attached (a change starts it over), and what it was last given. */
+  #light?: GlassLightHandle;
+  /** How the lens was attached (a change starts it over), what it was last given, and how it's lit. */
   #how = '';
   #params = '';
+  #lit = '';
   #started = false;
-  /** The shading and rim light on the element now, and the one last asked for (keys into `lights`). */
-  #light = '';
-  #wanted = '';
 
   /**
    * Lenses waiting to start: a couple each frame, and only once their element is on the page (the lens is cut
@@ -156,6 +109,7 @@ export class Glass {
     if ((this.#handle || Glass.#queue.has(this)) && how === this.#how) {
       this.#update();
       this.#move();
+      this.#aim();
       return;
     }
     this.#how = how;
@@ -166,11 +120,10 @@ export class Glass {
   /**
    * The lens's parameters, with the element's corners as they are now (the style can change them). When the
    * package styles the element, it reads the corners itself: given a number, it would write it onto the element.
-   * Otherwise the shading and rim light are left out of the filter, and drawn as an image instead (`lights`).
    */
   #lensParams() {
     if (this.#setup.ownStyles) return { ...this.#setup.params };
-    return { ...this.#setup.params, shade: 0, specular: false, radius: this.#radius() };
+    return { ...this.#setup.params, radius: this.#radius() };
   }
 
   /** Read the corners again, and take any new parameters. */
@@ -199,6 +152,8 @@ export class Glass {
     this.#handle = attachLiquidGlass(this.element, {
       ...params,
       applyStyles: own,
+      // the light on its own layer, the panel's ::before (see #paint), so the lens has less to redo
+      lightLayer: !own,
       support: s.support,
       ...(s.mapPixels ? { maxMapPixels: s.mapPixels } : {}),
       ...(s.mapScale ? { dpr: s.mapScale } : {}),
@@ -210,6 +165,7 @@ export class Glass {
     });
     this.#started = true;
     this.#move();
+    this.#aim();
   }
 
   /** Squish on press, or not: it comes and goes without touching the lens. */
@@ -222,44 +178,52 @@ export class Glass {
     }
   }
 
-  /** After each render: tell the CSS which way it's drawn, and hand it the lens and its light. */
+  /** The moving light, or not: like the squish, it comes and goes without touching the lens. Less motion snaps it. */
+  #aim() {
+    const s = this.#setup;
+    const lit = this.#handle && s.light ? JSON.stringify([s.light, s.reducedMotion]) : '';
+    if (lit === this.#lit) return;
+    this.#lit = lit;
+    this.#light?.destroy();
+    this.#light = this.#handle && s.light
+      ? attachGlassLight(this.#handle, { ...s.light, ...(s.reducedMotion ? { smoothing: 1 } : {}) })
+      : undefined;
+  }
+
+  /**
+   * After each render: tell the CSS which way it's drawn, and hand it the lens, and the lens's light: its
+   * shading and its lit rim, which the panel's ::before draws (styles/glass.css). In the lens's own filter, the
+   * light would be redone over the backdrop on every frame the lens is redrawn, which made a page of glass three
+   * times slower; on its own layer it's only redrawn when the light moves.
+   */
   #paint(handle: LiquidGlassHandle) {
     this.element.dataset.lens = handle.mode;
     if (this.#setup.ownStyles) return;
-    this.element.style.setProperty('--lens', handle.getStyle().backdropFilter ?? 'none');
-    const p = this.#setup.params ?? {};
-    const shade = p.shade ?? 0;
-    const rim = p.specular === false ? 0 : (p.specularStrength ?? 0.81);
-    if (handle.mode !== 'glass' || !(shade || rim)) return this.#setLight('');
-    const { key, url } = takeLight(handle.params, shade, rim);
-    if (key === this.#wanted) return dropLight(key);
-    this.#wanted = key;
-    // the old light stays until the new one is ready, so it never blinks off
-    url.then(src => {
-      if (this.#handle !== handle || this.#wanted !== key) return dropLight(key);
-      this.element.style.setProperty('--lens-light', `url("${src}")`);
-      this.#setLight(key);
-    }, () => dropLight(key));
+    const light = handle.getLightStyle();
+    this.#prop('--lens', handle.getStyle().backdropFilter);
+    this.#prop('--lens-light', light.backgroundImage);
+    this.#prop('--lens-lit', light.filter);
   }
 
-  /** Let go of the light on the element (and take the newly shown one, if any). */
-  #setLight(key: string) {
-    if (this.#light && this.#light !== key) dropLight(this.#light);
-    this.#light = key;
-    if (!key) {
-      this.#wanted = '';
-      this.element.style.removeProperty('--lens-light');
-    }
+  /** Set a custom property, or clear it; only when it changes, since this runs on every frame the light moves. */
+  #prop(name: string, value: string | undefined) {
+    const style = this.element.style;
+    if (style.getPropertyValue(name) === (value ?? '')) return;
+    if (value) style.setProperty(name, value);
+    else style.removeProperty(name);
   }
 
   #stop() {
     Glass.#queue.delete(this);
+    this.#light?.destroy();
     this.#motion?.destroy();
     this.#handle?.destroy();
-    this.#motion = this.#handle = undefined;
-    this.#setLight('');
+    this.#light = this.#motion = this.#handle = undefined;
+    this.#lit = '';
     delete this.element.dataset.lens;
     this.element.style.removeProperty('--lens');
+    this.element.style.removeProperty('--lens-light');
+    this.element.style.removeProperty('--lens-lit');
   }
 
   destroy() {

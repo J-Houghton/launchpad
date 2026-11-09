@@ -4,11 +4,28 @@ Where the browser can draw the lens (Chrome, Edge), a panel bends what's behind 
 (the style's --lens-tint) in place of its frosted fill. Elsewhere (data-lens="frost") the panels stay frosted.
 ================================*/
 @layer components {
-    /* the lens, the tint, and over them the lens's shading and rim light (an image: lib/glass.ts) */
     [data-lens="glass"] {
         -webkit-backdrop-filter: var(--lens);
         backdrop-filter: var(--lens);
-        background: var(--lens-light, none) border-box 0 0 / 100% 100% no-repeat, var(--lens-tint);
+        background: var(--lens-tint);
+        isolation: isolate;
+    }
+
+    :is(.topbar-inner, .widget, .panel)[data-lens="glass"] { position: relative; }
+
+    /* the lens's light: its shading and its rim, lit from the page and the pointer (lib/glass.ts), over the
+       tint and under what's on the panel */
+    [data-lens="glass"]::before {
+        content: "";
+        position: absolute;
+        inset: calc(var(--border-w) * -1);
+        z-index: -1;
+        display: block;
+        border-radius: inherit;
+        background: var(--lens-light, none) 0 0 / 100% 100% no-repeat;
+        filter: var(--lens-lit, none);
+        opacity: 1;
+        pointer-events: none;
     }
 
     /* ---- calm (page-backdrop.ts): a lens redraws whenever anything behind or on it moves, so while lenses
@@ -19,7 +36,7 @@ Where the browser can draw the lens (Chrome, Edge), a panel bends what's behind 
         animation-play-state: paused;
     }
 
-    :root[data-calm] .app-card::before,
+    :root[data-calm] .app-card:not([data-lens])::before,
     :root[data-calm] .app-card::after {
         display: none;
     }
@@ -58,7 +75,7 @@ Where the browser can draw the lens (Chrome, Edge), a panel bends what's behind 
         }
 
         :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .quick-links-highlight[data-lens="glass"] {
-            background: var(--lens-light, none) border-box 0 0 / 100% 100% no-repeat, transparent;
+            background: transparent;
         }
     }
 }
