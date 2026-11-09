@@ -8,6 +8,7 @@ import { config, sectionName, type Density, type Placement } from '../config.js'
 import { arrange } from '../lib/arrange.js';
 import { GRID, SPANS, setNewRow, setSpan, spanAt } from '../lib/layout.js';
 import { dragToReorder, keyboardReorder, type SortMove } from '../lib/sortable.js';
+import { controlGlass, segmentedGlass } from '../lib/glass-controls.js';
 import { StoreController } from '../lib/store-controller.js';
 import { Check, CornerDownLeft, EyeOff, GripVertical, LayoutGrid, MoveHorizontal, Plus, Save, icon } from '../lib/icons.js';
 
@@ -139,10 +140,10 @@ export class ArrangeBar extends LitElement {
     const { density, sections } = config.layout;
     const hidden = sections.filter(s => s.hidden);
     return html`
-      <div class="arrange-bar glass" role="toolbar" aria-label="Arrange the page">
+      <div class="arrange-bar glass" role="toolbar" aria-label="Arrange the page" ${controlGlass('bar')}>
         <span class="arrange-title">${icon(LayoutGrid)} Arrange</span>
         <span class="arrange-hint">Drag to move · drag an edge to resize · ${icon(CornerDownLeft)} starts a new row</span>
-        <div class="segmented sm" role="radiogroup" aria-label="Density">
+        <div class="segmented sm" role="radiogroup" aria-label="Density" ${segmentedGlass()}>
           ${DENSITIES.map(d => html`
             <label><input type="radio" name="arrange-density" .checked=${density === d.id}
                           @change=${() => arrange.edit(draft => { draft.layout.density = d.id; })}>${d.label}</label>`)}

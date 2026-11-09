@@ -15,6 +15,7 @@
   const css = document.createElement('style');
   css.textContent = `
     .lp-search {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 0.5rem;
@@ -30,6 +31,18 @@
     .lp-search:focus-within {
       border-color: var(--glass-border-hover);
       box-shadow: var(--shadow), 0 0 0 4px color-mix(in oklch, var(--accent) 15%, transparent);
+    }
+    /* in the styles drawn in liquid glass, the box is glass (Launchpad.glass), under a light tint */
+    .lp-search[data-lens="glass"] {
+      border-color: transparent;
+      background: color-mix(in oklab, var(--panel) 25%, transparent);
+      -webkit-backdrop-filter: var(--lens);
+      backdrop-filter: var(--lens);
+      box-shadow: 0 10px 24px -12px oklch(0 0 0 / 0.45), inset 0 0 0 1px var(--glass-border);
+    }
+    .lp-search[data-lens="glass"]:focus-within {
+      background: color-mix(in oklab, var(--panel) 40%, transparent);
+      box-shadow: 0 10px 24px -12px oklch(0 0 0 / 0.45), inset 0 0 0 1px var(--glass-border), 0 0 0 4px color-mix(in oklch, var(--accent) 15%, transparent);
     }
     .lp-search input {
       flex: 1;
@@ -118,7 +131,15 @@
       addEventListener('keydown', onKey);
 
       el.append(form);
-      return () => removeEventListener('keydown', onKey);
+      // a search field is a control: in the glass styles, it's glass (with Launchpad 2.3 and later)
+      const glass = window.Launchpad.glass?.(form, {
+        lens: { bezelWidth: 16, displacementScale: 36, shade: 0.25, specularStrength: 1, blur: 1.2, blurStage: 'before' },
+        rim: 1,
+      });
+      return () => {
+        removeEventListener('keydown', onKey);
+        glass?.destroy();
+      };
     },
   });
 })();

@@ -1,10 +1,11 @@
 // src/components/color-picker.ts
 // A colour picker drawn in the page's own style, in place of the browser's: a square for how strong and how
 // bright, a strip for the hue, and the hex code to type or paste. Each change goes to its host as a "pick"
-// event (detail: #rrggbb), at most once a frame while dragging.
+// event (detail: #rrggbb), at most once a frame while dragging. In the glass styles, the hue's knob is glass.
 import { LitElement, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { fromHsv, toHsv } from '../lib/colors.js';
+import { sliderGlass } from '../lib/glass-controls.js';
 
 const clamp = (n: number) => Math.min(1, Math.max(0, n));
 const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -119,8 +120,10 @@ export class ColorPicker extends LitElement {
               style="left: ${this.s * 100}%; top: ${(1 - this.v) * 100}%; background: ${hex}"
               @keydown=${this.#nudge}></span>
       </div>
-      <input class="cp-hue" type="range" min="0" max="359" step="1" aria-label="${this.label}: hue"
-             .value=${String(Math.round(this.h))} @input=${this.#hue}>
+      <div class="slider-glass" ${sliderGlass()}>
+        <input class="cp-hue" type="range" min="0" max="359" step="1" aria-label="${this.label}: hue"
+               .value=${String(Math.round(this.h))} @input=${this.#hue}>
+      </div>
       <div class="cp-foot">
         <span class="cp-now" style="background: ${hex}"></span>
         <input class="input mono cp-hex" spellcheck="false" autocomplete="off" maxlength="7" aria-label="${this.label}: hex code"

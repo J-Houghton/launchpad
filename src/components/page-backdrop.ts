@@ -4,21 +4,12 @@
 // (backgrounds/particles.ts) or one an extension adds (lib/extensions.ts). This runs its frames, sizes its
 // canvas and tells it the colours, so a background only has to draw.
 // The "still" background leaves the canvas out, and "plain" everything but the base colour.
-//
-// Liquid glass lenses (lib/panel-glass.ts) redraw on every frame where anything behind them moves, so while
-// they're drawn the page is "calm" (data-calm on the root): the backdrop's motion (the background, the glow
-// under the pointer and Neon's floor) moves together 30 times a second, and styles/glass.css stills the rest.
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
-import { isLiquidGlassSupported } from 'liquid-glass-filter';
 import '../backgrounds/particles.js';
 import { cssColor } from '../lib/colors.js';
 import { registry, type BackgroundType, type Colors } from '../lib/extensions.js';
 import { look } from '../lib/look.js';
-import { GLASS_STYLES } from '../lib/panel-glass.js';
-
-/** Calm frames are this far apart: 30 a second. */
-const CALM_MS = 1000 / 30;
 
 @customElement('page-backdrop')
 export class PageBackdrop extends LitElement {
@@ -35,11 +26,7 @@ export class PageBackdrop extends LitElement {
   #dpr = 1;
   #pointer: { x: number; y: number } | null = null;
   #pointerRaf = 0;
-  #pointerTimer = 0;
   #raf = 0;
-  #calm = false;
-  /** The pointer has moved since the glow was last put under it. */
-  #glowDue = false;
   #start = 0;
   #last = 0;
   #shown = '';
@@ -63,7 +50,6 @@ export class PageBackdrop extends LitElement {
     super.disconnectedCallback();
     cancelAnimationFrame(this.#raf);
     cancelAnimationFrame(this.#pointerRaf);
-    clearTimeout(this.#pointerTimer);
     this.#sizeObserver.disconnect();
     removeEventListener('pointermove', this.#onPointer);
     removeEventListener('pointerout', this.#onPointerOut);
@@ -80,8 +66,6 @@ export class PageBackdrop extends LitElement {
 
   #onLook = () => {
     if (!this.#canvas) return;
-    this.#calm = GLASS_STYLES.includes(look.style) && isLiquidGlassSupported();
-    document.documentElement.toggleAttribute('data-calm', this.#calm);
     const bg = this.#chosen();
     const shown = [look.theme, look.style, look.reducedMotion, bg?.name, JSON.stringify(look.colors)].join();
     if (shown === this.#shown && bg === this.#bg) return;
@@ -102,26 +86,15 @@ export class PageBackdrop extends LitElement {
 
   #onPointer = (e: PointerEvent) => {
     this.#pointer = { x: e.clientX, y: e.clientY };
-    if (!this.#calm) {
-      // the glow + reveal are positioned with CSS variables, updated at most once a frame
-      this.#pointerRaf ||= requestAnimationFrame(() => {
-        this.#pointerRaf = 0;
-        this.#glow();
-      });
-      return;
-    }
-    // calm: with the backdrop's frames if they're running, else on a calm schedule of its own
-    this.#glowDue = true;
-    if (this.#raf) return;
-    this.#pointerTimer ||= window.setTimeout(() => {
-      this.#pointerTimer = 0;
+    // the glow + reveal are positioned with CSS variables, updated at most once a frame
+    this.#pointerRaf ||= requestAnimationFrame(() => {
+      this.#pointerRaf = 0;
       this.#glow();
-    }, CALM_MS);
+    });
   };
 
   /** Put the glow (and the particles' reveal) under the pointer. */
   #glow() {
-    this.#glowDue = false;
     const b = this.#backdrop;
     if (!b || !this.#pointer) return;
     b.style.setProperty('--cx', `${this.#pointer.x}px`);
@@ -161,18 +134,11 @@ export class PageBackdrop extends LitElement {
 
   #frame = (now: number) => {
     this.#raf = this.#bg ? requestAnimationFrame(this.#frame) : 0;
-    // calm: every other frame, with all the backdrop's motion together
-    if (this.#calm && now - this.#last < CALM_MS - 2) return;
     // dragged to a screen with different scaling: same CSS size, so no resize event
     if (Math.min(devicePixelRatio || 1, 2) !== this.#dpr) this.#resize();
     const dt = Math.min((now - this.#last) / 16.67, 3); // frame-rate independent movement
     this.#last = now;
     this.#draw(dt);
-    if (this.#calm) {
-      if (this.#glowDue) this.#glow();
-      // Neon's floor, which otherwise runs as a CSS animation of its own (looks.css)
-      this.#backdrop?.style.setProperty('--floor', String(((now - this.#start) / 3200) % 1));
-    }
   };
 
   #draw(dt: number) {

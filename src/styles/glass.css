@@ -1,7 +1,9 @@
 /* ===============================
-LIQUID GLASS — Aurora, Liquid and Neon (lib/panel-glass.ts)
-Where the browser can draw the lens (Chrome, Edge), a panel bends what's behind it, under a light tint
-(the style's --lens-tint) in place of its frosted fill. Elsewhere (data-lens="frost") the panels stay frosted.
+LIQUID GLASS — Aurora, Liquid and Neon (lib/glass.ts, lib/glass-controls.ts)
+After Apple's guidelines: glass is the layer of controls that floats over the page, used sparingly: the
+header's links and buttons, the search box, menus, toasts, the gallery arrows and the arranging toolbar. The
+cards and widgets are the content, and keep the style's frosted panels. Where the browser can draw the lens
+(Chrome, Edge), a control bends what's behind it under a light tint; elsewhere (data-lens="frost") it's frosted.
 ================================*/
 @layer components {
     [data-lens="glass"] {
@@ -11,10 +13,10 @@ Where the browser can draw the lens (Chrome, Edge), a panel bends what's behind 
         isolation: isolate;
     }
 
-    :is(.topbar-inner, .widget, .panel)[data-lens="glass"] { position: relative; }
+    .theme-toggle[data-lens] { position: relative; }
 
     /* the lens's light: its shading and its rim, lit from the page and the pointer (lib/glass.ts), over the
-       tint and under what's on the panel */
+       tint and under what's on the control */
     [data-lens="glass"]::before {
         content: "";
         position: absolute;
@@ -28,54 +30,124 @@ Where the browser can draw the lens (Chrome, Edge), a panel bends what's behind 
         pointer-events: none;
     }
 
-    /* ---- calm (page-backdrop.ts): a lens redraws whenever anything behind or on it moves, so while lenses
-       are drawn the backdrop moves 30 times a second, and the page's always-moving touches hold still: the
-       glow's drift, the logo's swirl, the greeting's ring and sheen, the sun's turn and the cards' spotlight ---- */
-    :root[data-calm] :is(.blob, .brand-mark, .hero-title .type-live, .weather-icon .icon),
-    :root[data-calm] .eyebrow::before {
-        animation-play-state: paused;
+    /* ---- a control in glass: a light tint, a hairline round it and a soft shadow under it; its label in the
+       page's ink, not the accent (Apple keeps colour for the one action that matters) ---- */
+    :is(.theme-toggle, .gallery-btn, .quick-links)[data-lens="glass"] {
+        color: var(--ink);
+        background: color-mix(in oklab, var(--panel) 28%, transparent);
+        box-shadow: 0 8px 18px -10px oklch(0 0 0 / 0.45), inset 0 0 0 1px var(--glass-border);
     }
 
-    :root[data-calm] .app-card:not([data-lens])::before,
-    :root[data-calm] .app-card::after {
-        display: none;
+    :is(.theme-toggle, .gallery-btn)[data-lens="glass"]:hover {
+        color: var(--ink);
+        background: color-mix(in oklab, var(--panel) 45%, transparent);
     }
 
-    /* Neon's floor runs with the backdrop's frames instead of as an animation of its own */
-    :root[data-calm][data-style="neon"] .stripes {
+    /* the glass swells under the pointer itself, so no shrinking on press as well */
+    :is(.theme-toggle, .gallery-btn)[data-lens="glass"]:active { scale: none; }
+    tile-gallery[data-more-start] > .gallery-btn.prev[data-lens="glass"]:active,
+    tile-gallery[data-more-end] > .gallery-btn.next[data-lens="glass"]:active { scale: 1; }
+
+    /* where the lens can't be drawn, frosted */
+    :is(.theme-toggle, .quick-links)[data-lens="frost"] {
+        background: var(--glass-strong);
+        -webkit-backdrop-filter: var(--glass-blur);
+        backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--glass-border);
+    }
+
+    /* ---- toasts, menus and the arranging toolbar: panels of glass over the page, frostier, so what's on them
+       reads over whatever is behind ---- */
+    :is(.toast, .tile-menu, .arrange-bar)[data-lens="glass"] {
+        -webkit-backdrop-filter: var(--lens);
+        backdrop-filter: var(--lens);
+        border-color: var(--glass-border);
+        background: color-mix(in oklab, var(--panel) 45%, transparent);
+    }
+
+    /* ---- the header: a floating toolbar. It has no bar of its own: the title sits on the page, and the links
+       and the theme button are glass ---- */
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .topbar-inner {
+        padding-inline: 0.25rem 0;
+        border-color: transparent;
+        background: none;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        box-shadow: none;
         animation: none;
-        background-position: 0 calc(var(--floor, 0) * 56px), 50% 0;
+    }
+
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .topbar-inner:hover { border-color: transparent; }
+
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .quick-links {
+        padding: 0.25rem;
+        border-radius: var(--radius-full);
+    }
+
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .quick-links a { color: var(--ink); }
+
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .quick-links-highlight {
+        background: color-mix(in oklab, var(--ink) 9%, transparent);
+        box-shadow: none;
+    }
+
+    /* the scroll edge: what scrolls under the header blurs and fades into the background there, so the title and
+       the controls stay easy to read (at the top of the page, there's nothing under it to see) */
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .topbar { position: relative; }
+
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .topbar::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 -1.75rem;
+        z-index: -1;
+        background: linear-gradient(to bottom, color-mix(in oklab, var(--bg) 70%, transparent), transparent);
+        -webkit-backdrop-filter: blur(12px) saturate(1.2);
+        backdrop-filter: blur(12px) saturate(1.2);
+        -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+        mask-image: linear-gradient(to bottom, #000 55%, transparent);
+        pointer-events: none;
+    }
+
+    @supports (animation-timeline: scroll()) {
+        :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .topbar::before {
+            animation: scroll-edge linear both;
+            animation-timeline: scroll(root);
+            animation-range: 0 4rem;
+        }
+    }
+
+    @keyframes scroll-edge {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    /* ---- concentric corners: a card's tiles are as round as the card, less the space between them and its edge
+       (never less than the style's smallest corner) ---- */
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .env-tile {
+        border-radius: max(var(--radius-sm), calc(var(--radius-lg) - clamp(1rem, 3vw, 1.375rem)));
+    }
+
+    /* ---- section labels in sentence case, as Apple's lists now have them, rather than in capitals (Neon keeps
+       its signage) ---- */
+    :root:is([data-style="aurora"], [data-style="liquid"]) :is(.widget-label, .panel-title) {
+        font-size: var(--fs-xs);
+        letter-spacing: 0;
+        text-transform: none;
     }
 
     /* asked for less see-through glass: the style's near-solid fill over the lens */
     @media (prefers-reduced-transparency: reduce) {
-        [data-lens="glass"] { background: var(--glass-strong); }
+        [data-lens="glass"],
+        :is(.theme-toggle, .gallery-btn, .quick-links, .toast, .tile-menu, .arrange-bar)[data-lens="glass"] { background: var(--glass-strong); }
     }
 
-    /* ---- the header's links as pills, and a drop of glass that slides to the one under the pointer ---- */
-    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .quick-links ul { gap: 0.375rem; }
-
-    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .quick-links a {
-        background: color-mix(in oklab, var(--ink) 6%, transparent);
-        box-shadow: inset 0 0 0 1px var(--hairline);
-        color: var(--ink);
-        transition:
-            color var(--dur-fast) ease,
-            background-color var(--dur-fast) ease,
-            scale var(--dur-med) var(--ease-spring);
-    }
-
-    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .quick-links a:active { scale: 0.94; }
-
-    @supports (anchor-name: --a) {
-        /* the drop sits over the links, so it bends the one it's on */
-        :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .quick-links-highlight {
-            z-index: 2;
-            box-shadow: 0 6px 16px -6px oklch(0 0 0 / 0.35), inset 0 0 0 1px var(--glass-border);
+    /* asked for more contrast: a solid edge round every glass control, and a firmer fill */
+    @media (prefers-contrast: more) {
+        [data-lens="glass"] {
+            outline: 1.5px solid color-mix(in oklab, var(--ink) 60%, transparent);
+            outline-offset: -1.5px;
         }
 
-        :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .quick-links-highlight[data-lens="glass"] {
-            background: transparent;
-        }
+        :is(.theme-toggle, .gallery-btn, .quick-links, .toast, .tile-menu, .arrange-bar)[data-lens="glass"] { background: var(--glass-strong); }
     }
 }
