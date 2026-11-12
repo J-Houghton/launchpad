@@ -34,7 +34,12 @@ It builds to **one self-contained `index.html`** that runs straight from disk, w
 
   Aurora, Liquid and Neon follow Apple's **Liquid Glass** guidelines. Glass is kept for the controls that float over the page, and the cards and widgets are the content, on the style's frosted panels.
   - **The header** is a floating toolbar. The title sits on the page, and the links share one capsule of glass, beside a round glass theme button. As the page scrolls, what passes under the header blurs and fades so they stay easy to read.
-  - **Other controls in glass**: the search box (its Search button is the one tinted with the accent), the gallery arrows, tile menus, toasts and the arranging toolbar. Menus grow out of the button that opens them.
+  - **Other controls in glass**: the greeting's pill, the search box (its Search button is the one tinted with the accent), the gallery arrows, tile menus, toasts and the arranging toolbar. Menus grow out of the button that opens them.
+  - **Floating over the page**:
+    - **A dock.** Once the Pinned panel has scrolled out of sight (or if it's left off the page), your pinned links come up in a glass bar at the bottom of the window.
+    - **Corner buttons.** Settings sits in the bottom corner, joined by "back to the top" once you've scrolled.
+    - **Sticky headings.** A group's heading (or the cards' own, without groups) is a glass capsule that stays under the header while its cards scroll by.
+    - **A tile lens.** One lens glides to the tile under the pointer, or the one the keyboard is on, and draws it a touch larger.
   - **How the glass behaves**: it bends whatever is behind it, and its edge catches a fine line of light, from above the page and from the pointer as it comes near, gliding round as it moves. Buttons swell and squish when pressed.
   - **Settings** works the same way. The sheet stays plain, and its controls float over it in glass; the header and footer stay put while the settings scroll under them. In a row of choices, the selection lifts into a lens you can drag along the row. Switches, and the colour picker's hue, have knobs that turn into clear lenses while you hold them. With nothing to save, the footer's buttons merge into **Done**; make a change and they part from it.
   - **Shapes and labels**: a card's tiles are rounded to match the card around them, and in Aurora and Liquid the section labels are in sentence case rather than capitals.

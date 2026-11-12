@@ -85,10 +85,28 @@ APPS — section head, app rows, env tiles
     }
 
     /* ---- groups ---- */
-    .app-group {
+    .app-group { display: grid; }
+
+    /* folding: the row the cards are in closes to nothing, and everything below slides up with it */
+    .group-fold {
         display: grid;
-        gap: 0.75rem;
+        grid-template-rows: 1fr;
+        transition: grid-template-rows var(--dur-slow) var(--ease-out), visibility var(--dur-slow);
     }
+
+    .group-fold-inner {
+        min-height: 0;
+        /* clipped as it folds, with room for the cards' shadows and the gallery arrows */
+        overflow: clip;
+        overflow-clip-margin: 1rem;
+    }
+
+    .app-group[data-collapsed] .group-fold {
+        grid-template-rows: 0fr;
+        visibility: hidden;
+    }
+
+    [data-motion="reduced"] .group-fold { transition: none; }
 
     .app-group + .app-group { margin-top: 0.75rem; }
 
@@ -127,6 +145,7 @@ APPS — section head, app rows, env tiles
     .group-apps {
         display: grid;
         gap: 1rem;
+        padding-top: 0.75rem;
     }
 
     /* "2 hidden" — apps switched off in My view */
