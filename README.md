@@ -317,6 +317,24 @@ Releases are numbered automatically. The first uses the version in `package.json
 
 > Anything in a published `launchpad.config.js` is public. Keep private addresses and internal hostnames in your own local copy.
 
+## Tests
+
+The page tests live in `tests/e2e`. They drive a real browser against the built page, opened from disk the way it's used: clicking through Settings, dragging, scrolling, and checking what the page did.
+
+```sh
+npm test              # builds the page, then runs every test (about 4 minutes)
+npm run test:quick    # runs them against the build that's already in dist/
+npx playwright test layout        # one file
+npx playwright test --headed      # watch it happen
+```
+
+- **Browser:** liquid glass is only drawn by Chromium browsers, so the tests use Edge on Windows and Playwright's own Chromium elsewhere (`npx playwright install chromium` once). Set `LAUNCHPAD_BROWSER` to `msedge`, `chrome` or `chromium` to choose.
+- **Firefox:** `choices.firefox.spec.js` runs in Firefox, and needs `npx playwright install firefox` once.
+- **Dev server:** `glass.spec.js` reads each lens through the source, so the run starts the dev server on port 5179 (or uses one that's already there).
+- **What's left behind:** screenshots taken along the way, and the throwaway copies of the page, go in `test-results/`.
+
+Each file is one walk through a feature, and its checks are soft: a failed check is reported and the walk carries on, so one run shows everything that's wrong. The checks time animations, so the files run two at a time; a very busy machine can still make one fail.
+
 ## Privacy
 
 Everything runs in your browser. Out of the box, the only outside requests are the weather and place search from [Open-Meteo](https://open-meteo.com/), plus the status checks to your own tile addresses. Widgets you add reach the addresses you give them, and the search box sends what you type to the engine you chose only when you search. Personal settings, and anything typed into Notes, are kept in the browser's local storage.
