@@ -50,6 +50,27 @@ export type GlassSetup = {
   reducedTransparency?: boolean | 'auto';
 };
 
+/**
+ * Whether this element can be glass just now. While the page is being arranged (lib/arrange.ts marks the root),
+ * each section and card is lifted out as a picture of itself so it can glide to its new place, and glass inside
+ * one can't see the page behind it: it would draw as a dark slab. So in there it waits until arranging is over.
+ */
+export const canBeGlass = (el: Element) => !(document.documentElement.classList.contains('is-arranging') && el.closest('.layout-item'));
+
+const arrangingWatchers = new Set<() => void>();
+let watchingArranging = false;
+
+/** Calls `run` whenever arranging starts or stops (and the theme changes, which marks the root too). */
+export function onArranging(run: () => void) {
+  if (!watchingArranging) {
+    watchingArranging = true;
+    new MutationObserver(() => { for (const watcher of [...arrangingWatchers]) watcher(); })
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  }
+  arrangingWatchers.add(run);
+  return () => { arrangingWatchers.delete(run); };
+}
+
 /** Every glass on the page now. */
 export const glasses = new Set<Glass>();
 

@@ -233,6 +233,7 @@ test('liquid glass: on the controls and what floats over the page, never the con
   await p.waitForTimeout(1200);
   await p.locator('.arrange-bar[data-lens]').waitFor();
   ok(await p.locator('.arrange-bar').getAttribute('data-lens') === 'glass', 'arranging: the toolbar is glass');
+  ok(await p.locator('.layout-item [data-lens]').count() === 0, '…and nothing inside a section is, while it can be lifted and moved (glass can\'t see the page from in there)');
   ok(await p.locator('.page-action').count() === 0, '…and the corner buttons step aside');
   ok(!(await lenses(p)).some(x => CONTENT.includes(x.kind)), '…and the cards still aren\'t');
   await p.locator('.arrange-bar').getByRole('button', { name: 'Cancel' }).click();

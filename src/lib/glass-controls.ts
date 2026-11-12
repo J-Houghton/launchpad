@@ -21,7 +21,7 @@ import {
   type GlassFilterHandle, type GlassMotionOptions, type GlassParams, type SpringConfig, type SpringPhysics,
   type SpringState,
 } from 'liquid-glass-filter';
-import { GLASS_STYLES, Glass, lensHolder, type GlassSetup } from './glass.js';
+import { GLASS_STYLES, Glass, canBeGlass, lensHolder, onArranging, type GlassSetup } from './glass.js';
 import { look } from './look.js';
 
 /** Whether the page's style is drawn in glass. */
@@ -119,6 +119,7 @@ class ControlGlassDirective extends AsyncDirective {
   #on = true;
   #glass?: Glass;
   #listening = false;
+  #unwatch?: () => void;
   #sync = () => this.#apply();
 
   constructor(part: PartInfo) {
@@ -140,12 +141,17 @@ class ControlGlassDirective extends AsyncDirective {
   #listen(on: boolean) {
     if (on === this.#listening) return;
     this.#listening = on;
-    if (on) look.addEventListener('change', this.#sync);
-    else look.removeEventListener('change', this.#sync);
+    if (on) {
+      look.addEventListener('change', this.#sync);
+      this.#unwatch = onArranging(this.#sync);
+    } else {
+      look.removeEventListener('change', this.#sync);
+      this.#unwatch?.();
+    }
   }
 
   #setup(): GlassSetup | undefined {
-    if (!glassOn() || !this.#on) return undefined;
+    if (!glassOn() || !this.#on || (this.#element && !canBeGlass(this.#element))) return undefined;
     const kind = this.#kind;
     return {
       params: themed({ button: BUTTON, field: FIELD, bar: BAR, menu: MENU }[kind]),

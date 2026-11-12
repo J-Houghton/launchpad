@@ -1,7 +1,7 @@
 // src/lib/extensions.ts
 // Extensions: script files next to index.html, listed in the config ("extensions"), that add widgets and
-// backgrounds through window.Launchpad, and can put liquid glass on what they draw (see the README, and the
-// examples in public/extensions/).
+// backgrounds through window.Launchpad, and can put liquid glass on what they draw (see
+// docs/technical/extension-api.md, and the examples in public/extensions/).
 //
 // They're plain scripts rather than modules, so they load from disk too. They run with the page's full
 // trust — which is why they only ever come from files beside it, never from an address or from text in
@@ -9,7 +9,7 @@
 import type { GlassMotionOptions, GlassParams } from 'liquid-glass-filter';
 import { config, isExtensionPath, isKey, isName } from '../config.js';
 import { safeMode } from './custom-css.js';
-import { GLASS_STYLES, Glass, type GlassSetup } from './glass.js';
+import { GLASS_STYLES, Glass, canBeGlass, onArranging, type GlassSetup } from './glass.js';
 import { look } from './look.js';
 import { toast } from './util.js';
 
@@ -116,7 +116,7 @@ function extensionGlass(el: HTMLElement, options: GlassOptions = {}): ExtensionG
   const setup = (): GlassSetup => ({ params, motion, rimPx: rim, light: options.light === false ? false : {}, reducedMotion: look.reducedMotion });
   let glass: Glass | undefined;
   const sync = () => {
-    const on = !!options.always || GLASS_STYLES.includes(look.style);
+    const on = (!!options.always || GLASS_STYLES.includes(look.style)) && canBeGlass(el);
     if (on && glass) glass.set(setup());
     else if (on) glass = new Glass(el, setup());
     else {
@@ -126,6 +126,7 @@ function extensionGlass(el: HTMLElement, options: GlassOptions = {}): ExtensionG
   };
   sync();
   look.addEventListener('change', sync);
+  const unwatch = onArranging(sync);
   let gone = false;
   return Object.freeze({
     update(lens: Partial<GlassParams>) {
@@ -138,6 +139,7 @@ function extensionGlass(el: HTMLElement, options: GlassOptions = {}): ExtensionG
       if (gone) return;
       gone = true;
       look.removeEventListener('change', sync);
+      unwatch();
       glass?.destroy();
       glass = undefined;
     },
