@@ -17,6 +17,7 @@ BASE
     html {
         background: var(--bg);
         scroll-padding-top: 6rem; /* keep scrolled-to content clear of the sticky header */
+        scrollbar-gutter: stable; /* the page keeps its width as its scrollbar comes and goes, so nothing resizes */
         scrollbar-color: color-mix(in oklch, var(--ink) 25%, transparent) transparent;
     }
 

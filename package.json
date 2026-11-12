@@ -8,6 +8,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "npm run build && playwright test",
+    "test:quick": "playwright test",
+    "docs:shots": "node scripts/screenshots.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -18,6 +21,7 @@
     "lucide": "^1.62.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/node": "^22.20.5",
     "typescript": "^7.0.2",
     "vite": "^8.3.5"

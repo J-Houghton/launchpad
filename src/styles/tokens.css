@@ -300,7 +300,8 @@ TOKENS
         --ink-mix: black;
 
         --panel: oklch(1 0 0);
-        --glass: color-mix(in oklab, var(--panel) 22%, transparent);
+        /* enough body for the panels to read on the backdrop, now that they aren't lenses with a lit edge */
+        --glass: color-mix(in oklab, var(--panel) 42%, transparent);
         --glass-strong: color-mix(in oklab, var(--panel) 86%, transparent);
         --glass-border: oklch(1 0 0 / 0.7);
         --glass-border-hover: oklch(1 0 0 / 0.95);
@@ -317,10 +318,11 @@ TOKENS
         --ring: oklch(from var(--accent) 0.55 calc(c * 1.1) h);
         --lens-tint: color-mix(in oklab, var(--panel) 28%, transparent);
 
-        --blob-1: oklch(from var(--accent) 0.72 calc(c * 1.05) h / 0.85);
-        --blob-2: oklch(from var(--accent-2) 0.76 calc(c * 0.9) h / 0.75);
-        --blob-3: oklch(from var(--accent-3) 0.85 calc(c * 1.1) h / 0.85);
-        --blob-4: oklch(from var(--accent) 0.8 calc(c * 0.8) calc(h - 40) / 0.7);
+        /* a third calmer than it was: at full strength it measured twice as strong as Aurora's or Neon's */
+        --blob-1: oklch(from var(--accent) 0.76 calc(c * 0.95) h / 0.6);
+        --blob-2: oklch(from var(--accent-2) 0.8 calc(c * 0.85) h / 0.5);
+        --blob-3: oklch(from var(--accent-3) 0.87 c h / 0.6);
+        --blob-4: oklch(from var(--accent) 0.83 calc(c * 0.75) calc(h - 40) / 0.5);
         --particle: oklch(1 0 0 / 0.9);
         --grain-opacity: 0;
         --card-hue: calc(var(--hue-1) - 25);

@@ -28,3 +28,7 @@ LiquidGLass-UI
 
 # Dev-only labs (side-by-side experiments), kept out of the repo
 lab/
+
+# What the page tests leave behind (npm test)
+test-results/
+playwright-report/

@@ -3,6 +3,7 @@
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { config, primaryTimeZone } from '../config.js';
+import { controlGlass } from '../lib/glass-controls.js';
 import { StoreController } from '../lib/store-controller.js';
 import { reducedMotion } from '../lib/transition.js';
 
@@ -83,8 +84,9 @@ export class HeroSection extends LitElement {
     // the invisible "ghost" copy reserves the final size so nothing shifts while typing
     return html`
       <section class="hero" aria-label="Welcome">
+        <!-- outside the headline's wrapper, which blurs as the page scrolls: glass can't see the page from inside that -->
+        <p class="eyebrow enter" style="--i:0" ${controlGlass('bar')}><span class="eyebrow-dot"></span>${greeting()}</p>
         <div class="hero-copy">
-          <p class="eyebrow enter" style="--i:0"><span class="eyebrow-dot"></span>${greeting()}</p>
           <h1 class="hero-title type-stack enter" style="--i:1">
             <span class="visually-hidden">${title}</span>
             <span class="type-ghost" aria-hidden="true">${title}</span>

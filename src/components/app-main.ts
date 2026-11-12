@@ -160,19 +160,22 @@ export class AppMain extends LitElement {
       </div>`;
   }
 
-  // a collapsible group of cards; collapsing is remembered per browser (My view), and undone while arranging
+  // a collapsible group of cards; collapsing is remembered per browser (My view), and undone while arranging.
+  // Its cards stay on the page, folded away, so it folds and unfolds smoothly and what's below slides with it
   #group(id: string, name: string, cards: Card[], start: number) {
     const collapsed = !arrange.active && prefs.isCollapsed(id);
     return html`
       <section class="app-group" data-group=${id === '__other' ? 'other' : id} ?data-collapsed=${collapsed} aria-label=${name}>
         <button class="group-head enter" type="button" style="--i:${8 + start}" aria-expanded=${String(!collapsed)}
-                @click=${() => transition(() => prefs.toggleCollapsed(id))}>
+                @click=${() => prefs.toggleCollapsed(id)} ${controlGlass('bar')}>
           ${icon(ChevronDown)}
           <span class="group-name">${name}</span>
           <span class="count">${cards.length}</span>
           <span class="group-rule" aria-hidden="true"></span>
         </button>
-        ${collapsed ? nothing : this.#grid(cards, id === '__other' ? '' : id, start, 'group-apps')}
+        <div class="group-fold">
+          <div class="group-fold-inner">${this.#grid(cards, id === '__other' ? '' : id, start, 'group-apps')}</div>
+        </div>
       </section>
     `;
   }
@@ -201,7 +204,7 @@ export class AppMain extends LitElement {
     return html`
       <section class="apps" aria-labelledby="cards-title" style="--env-count:${Math.max(config.columns.length, 1)}">
         <div class="section-head enter" style="--i:7">
-          <h2 id="cards-title" class=${heading ? '' : 'visually-hidden'}>
+          <h2 id="cards-title" class=${heading ? '' : 'visually-hidden'} ${controlGlass('bar', !!heading)}>
             ${heading || 'Links'} ${heading ? html`<span class="count">${cards.length}</span>` : nothing}
           </h2>
           ${hidden ? html`

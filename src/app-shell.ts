@@ -15,6 +15,7 @@ import './components/site-footer.js';
 import './components/tile-menu.js';
 import './components/settings-panel.js';
 import './components/setup-guide.js';
+import './components/floating.js';
 import { arrangeTools, gridGuides, resizeHandle } from './components/arrange-ui.js';
 import { config, sectionName, type SectionId } from './config.js';
 import { arrange } from './lib/arrange.js';
@@ -98,6 +99,9 @@ export class AppShell extends LitElement {
       <settings-panel></settings-panel>
       <setup-guide></setup-guide>
       <arrange-bar></arrange-bar>
+      <tile-lens></tile-lens>
+      <pin-dock></pin-dock>
+      <page-actions></page-actions>
     `;
   }
 }

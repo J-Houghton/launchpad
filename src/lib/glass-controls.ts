@@ -21,7 +21,7 @@ import {
   type GlassFilterHandle, type GlassMotionOptions, type GlassParams, type SpringConfig, type SpringPhysics,
   type SpringState,
 } from 'liquid-glass-filter';
-import { GLASS_STYLES, Glass, lensHolder, type GlassSetup } from './glass.js';
+import { GLASS_STYLES, Glass, canBeGlass, lensHolder, onArranging, type GlassSetup } from './glass.js';
 import { look } from './look.js';
 
 /** Whether the page's style is drawn in glass. */
@@ -29,8 +29,15 @@ export const glassOn = () => GLASS_STYLES.includes(look.style);
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+/**
+ * A lens's parameters as the theme has them: in the light theme the edge is shaded far less, or the glass
+ * reads as grey over a pale page.
+ */
+export const themed = (params: Partial<GlassParams>): Partial<GlassParams> =>
+  (look.theme === 'light' ? { ...params, shade: (params.shade ?? 0) * 0.3 } : params);
+
 /** A value that follows its target on a spring, a frame at a time. */
-class Spring {
+export class Spring {
   state: SpringState;
   to: number;
   #physics: SpringPhysics;
@@ -56,7 +63,7 @@ class Spring {
 }
 
 /** Calls `step` with each frame's seconds while it returns true. */
-function frames(step: (dt: number) => boolean) {
+export function frames(step: (dt: number) => boolean) {
   let id = 0;
   let last = 0;
   const tick = (now: number) => {
@@ -99,12 +106,12 @@ const BUTTON_MOTION: GlassMotionOptions = {
 const FIELD_MOTION: GlassMotionOptions = { press: { scale: 0.985, dim: 1, spring: { duration: 0.3, bounce: 0.2 } }, drag: false };
 
 /** Maps are small for these: a control is small, and its rim smooth. */
-const CONTROL_MAP_PIXELS = 12_000;
+export const CONTROL_MAP_PIXELS = 12_000;
 /**
  * The lit rim of a control, CSS px: a fine bright edge, as Apple's controls have. The package's 2 suits a lens a
  * few hundred px across; on a control 36 px high it reads as a thick outline.
  */
-const CONTROL_RIM = 1;
+export const CONTROL_RIM = 1;
 
 class ControlGlassDirective extends AsyncDirective {
   #element?: HTMLElement;
@@ -112,6 +119,7 @@ class ControlGlassDirective extends AsyncDirective {
   #on = true;
   #glass?: Glass;
   #listening = false;
+  #unwatch?: () => void;
   #sync = () => this.#apply();
 
   constructor(part: PartInfo) {
@@ -133,15 +141,20 @@ class ControlGlassDirective extends AsyncDirective {
   #listen(on: boolean) {
     if (on === this.#listening) return;
     this.#listening = on;
-    if (on) look.addEventListener('change', this.#sync);
-    else look.removeEventListener('change', this.#sync);
+    if (on) {
+      look.addEventListener('change', this.#sync);
+      this.#unwatch = onArranging(this.#sync);
+    } else {
+      look.removeEventListener('change', this.#sync);
+      this.#unwatch?.();
+    }
   }
 
   #setup(): GlassSetup | undefined {
-    if (!glassOn() || !this.#on) return undefined;
+    if (!glassOn() || !this.#on || (this.#element && !canBeGlass(this.#element))) return undefined;
     const kind = this.#kind;
     return {
-      params: { button: BUTTON, field: FIELD, bar: BAR, menu: MENU }[kind],
+      params: themed({ button: BUTTON, field: FIELD, bar: BAR, menu: MENU }[kind]),
       mapPixels: CONTROL_MAP_PIXELS,
       rimPx: CONTROL_RIM,
       light: {},
@@ -238,7 +251,9 @@ export function glassToast(el: HTMLElement) {
     const state: { el: HTMLElement; glass?: Glass } = { el };
     toastGlass = state;
     const sync = () => {
-      if (glassOn()) state.glass ??= new Glass(el, { params: TOAST, mapPixels: CONTROL_MAP_PIXELS, rimPx: CONTROL_RIM, light: {} });
+      const setup: GlassSetup = { params: themed(TOAST), mapPixels: CONTROL_MAP_PIXELS, rimPx: CONTROL_RIM, light: {} };
+      if (glassOn() && state.glass) state.glass.set(setup);
+      else if (glassOn()) state.glass = new Glass(el, setup);
       else {
         state.glass?.destroy();
         state.glass = undefined;
@@ -380,7 +395,7 @@ class Segmented {
     this.#box.lensWidth = widest + DROP_PAD * 2;
     this.#lens.style.width = `${this.#box.lensWidth}px`;
     this.#lens.style.height = `${this.#box.height + DROP_PAD * 2}px`;
-    this.#glass = new Glass(this.#lens, { params: DROP, light: {}, mapPixels: 6000, rimPx: CONTROL_RIM });
+    this.#glass = new Glass(this.#lens, { params: themed(DROP), light: {}, mapPixels: 6000, rimPx: CONTROL_RIM });
   }
 
   #move = (e: PointerEvent) => {
@@ -415,8 +430,9 @@ class Segmented {
       setTimeout(() => (this.#swallow = false));
       const item = this.#itemAt(e.clientX);
       if (item && !isChosen(item)) {
+        // the radio button itself, where there is one: Firefox doesn't pass a scripted click on its label along
         this.#ours = true;
-        item.click();
+        (item.querySelector<HTMLElement>('input') ?? item).click();
         this.#ours = false;
       }
     }
@@ -746,7 +762,7 @@ class GlassSlider {
   #down = (e: PointerEvent) => {
     if (e.button !== 0 || !this.#on || look.reducedMotion) return;
     // glass from the first time it's held: a picker that's never used costs nothing
-    this.#glass ??= new Glass(this.#knob, { params: KNOB, light: {}, mapPixels: 4000, rimPx: CONTROL_RIM });
+    this.#glass ??= new Glass(this.#knob, { params: themed(KNOB), light: {}, mapPixels: 4000, rimPx: CONTROL_RIM });
     this.#held = true;
     this.#scale.to = 1;
     this.#clear.to = 1;

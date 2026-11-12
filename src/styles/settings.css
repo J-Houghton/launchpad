@@ -2040,7 +2040,7 @@ SETTINGS — modal dialog, form controls
     .settings :is(.btn, .icon-btn)[data-lens="glass"] {
         color: var(--ink);
         background: color-mix(in oklab, var(--panel) 30%, transparent);
-        box-shadow: 0 8px 18px -10px oklch(0 0 0 / 0.45), inset 0 0 0 1px var(--glass-border);
+        box-shadow: var(--control-shadow), inset 0 0 0 1px var(--glass-border);
     }
 
     .settings .btn-soft[data-lens="glass"] {
@@ -2059,7 +2059,7 @@ SETTINGS — modal dialog, form controls
 
     .settings :is(.mode-switch, .settings-tabs)[data-lens="glass"] {
         background: color-mix(in oklab, var(--panel) 22%, transparent);
-        box-shadow: 0 8px 20px -12px oklch(0 0 0 / 0.45), inset 0 0 0 1px var(--glass-border);
+        box-shadow: var(--control-shadow), inset 0 0 0 1px var(--glass-border);
     }
 
     /* where the browser can't draw the lens, the floating controls are frosted, so they read over the sheet */

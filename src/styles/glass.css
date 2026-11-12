@@ -6,6 +6,10 @@ cards and widgets are the content, and keep the style's frosted panels. Where th
 (Chrome, Edge), a control bends what's behind it under a light tint; elsewhere (data-lens="frost") it's frosted.
 ================================*/
 @layer components {
+    /* the shadow under a glass control: soft in the light theme, where a dark one greys the glass */
+    :root { --control-shadow: 0 8px 18px -10px oklch(0 0 0 / 0.2); }
+    :root.theme-dark { --control-shadow: 0 8px 18px -10px oklch(0 0 0 / 0.5); }
+
     [data-lens="glass"] {
         -webkit-backdrop-filter: var(--lens);
         backdrop-filter: var(--lens);
@@ -32,24 +36,24 @@ cards and widgets are the content, and keep the style's frosted panels. Where th
 
     /* ---- a control in glass: a light tint, a hairline round it and a soft shadow under it; its label in the
        page's ink, not the accent (Apple keeps colour for the one action that matters) ---- */
-    :is(.theme-toggle, .gallery-btn, .quick-links)[data-lens="glass"] {
+    :is(.theme-toggle, .gallery-btn, .quick-links, .eyebrow, .group-head, .section-head h2, .pin-dock, .page-action)[data-lens="glass"] {
         color: var(--ink);
         background: color-mix(in oklab, var(--panel) 28%, transparent);
-        box-shadow: 0 8px 18px -10px oklch(0 0 0 / 0.45), inset 0 0 0 1px var(--glass-border);
+        box-shadow: var(--control-shadow), inset 0 0 0 1px var(--glass-border);
     }
 
-    :is(.theme-toggle, .gallery-btn)[data-lens="glass"]:hover {
+    :is(.theme-toggle, .gallery-btn, .page-action)[data-lens="glass"]:hover {
         color: var(--ink);
         background: color-mix(in oklab, var(--panel) 45%, transparent);
     }
 
     /* the glass swells under the pointer itself, so no shrinking on press as well */
-    :is(.theme-toggle, .gallery-btn)[data-lens="glass"]:active { scale: none; }
+    :is(.theme-toggle, .gallery-btn, .page-action)[data-lens="glass"]:active { scale: none; }
     tile-gallery[data-more-start] > .gallery-btn.prev[data-lens="glass"]:active,
     tile-gallery[data-more-end] > .gallery-btn.next[data-lens="glass"]:active { scale: 1; }
 
     /* where the lens can't be drawn, frosted */
-    :is(.theme-toggle, .quick-links)[data-lens="frost"] {
+    :is(.theme-toggle, .quick-links, .group-head, .section-head h2, .pin-dock, .page-action)[data-lens="frost"] {
         background: var(--glass-strong);
         -webkit-backdrop-filter: var(--glass-blur);
         backdrop-filter: var(--glass-blur);
@@ -121,6 +125,186 @@ cards and widgets are the content, and keep the style's frosted panels. Where th
         to { opacity: 1; }
     }
 
+    /* ---- the greeting's pill: glass, with its travelling light on a layer of its own (the lens's light takes
+       ::before) ---- */
+    .eyebrow[data-lens="glass"]::before {
+        inset: calc(var(--border-w) * -1);
+        z-index: -1;
+        padding: 0;
+        background: var(--lens-light, none) 0 0 / 100% 100% no-repeat;
+        filter: var(--lens-lit, none);
+        -webkit-mask: none;
+        mask: none;
+        animation: none;
+    }
+
+    .eyebrow[data-lens="glass"]::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        padding: 1px;
+        border-radius: inherit;
+        background: conic-gradient(from var(--angle), transparent 0 62%, var(--accent) 80%, var(--accent-2) 88%, transparent 100%);
+        mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+        animation: spin-angle 5s linear infinite;
+        pointer-events: none;
+    }
+
+    /* ---- section headings: capsules of glass that stay under the header while their cards scroll by. With
+       groups, each group's heading does; with none, the cards' own. Not while arranging ---- */
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]):not(.is-arranging) :is(.app-group > .group-head, .apps:not(:has(.app-group)) > .section-head) {
+        position: sticky;
+        z-index: 5;
+        top: 4.75rem;
+    }
+
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .group-head {
+        width: fit-content;
+        padding: 0.4rem 1rem 0.4rem 0.75rem;
+        border-radius: var(--radius-full);
+        color: var(--ink);
+    }
+
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .group-rule { display: none; }
+
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .section-head h2 {
+        position: relative;
+        padding: 0.3rem 0.9rem;
+        margin-left: -0.65rem;
+        border-radius: var(--radius-full);
+    }
+
+    /* the heading's row lets clicks through to the cards passing under it */
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .section-head { pointer-events: none; }
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .section-head > * { pointer-events: auto; }
+
+    /* ---- the dock: pinned links in a bar at the foot of the window, while the Pinned panel is out of sight ---- */
+    .pin-dock {
+        position: fixed;
+        z-index: 40;
+        left: 50%;
+        bottom: max(1rem, env(safe-area-inset-bottom));
+        max-width: calc(100vw - 9rem);
+        padding: 0.3rem;
+        border-radius: var(--radius-full);
+        translate: -50% calc(100% + 2rem);
+        opacity: 0;
+        visibility: hidden;
+        transition:
+            translate var(--dur-slow) var(--ease-spring),
+            opacity var(--dur-med) ease,
+            visibility var(--dur-slow);
+    }
+
+    .pin-dock[data-shown] {
+        translate: -50% 0;
+        opacity: 1;
+        visibility: visible;
+    }
+
+    [data-motion="reduced"] .pin-dock { transition: none; }
+
+    .pin-dock ul {
+        display: flex;
+        gap: 0.125rem;
+        overflow-x: auto;
+        scrollbar-width: none;
+        border-radius: inherit;
+    }
+
+    .dock-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.5rem 0.9rem;
+        border-radius: var(--radius-full);
+        color: var(--ink);
+        font-size: var(--fs-sm);
+        font-weight: 550;
+        white-space: nowrap;
+        transition: background-color var(--dur-fast) ease, scale var(--dur-med) var(--ease-spring);
+    }
+
+    .dock-link:hover,
+    .dock-link:focus-visible { background: color-mix(in oklab, var(--ink) 9%, transparent); }
+    .dock-link:active { scale: 0.95; }
+
+    .dock-tag {
+        font-family: var(--font-label);
+        font-size: 0.6875rem;
+        font-weight: 650;
+        letter-spacing: 0.06em;
+        color: var(--env, var(--accent));
+    }
+
+    /* the foot of the page keeps clear of the dock and the corner's buttons */
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]):not(.is-arranging) .site-footer { padding-bottom: 4.5rem; }
+
+    /* toasts rise above it while it's there */
+    :root[data-dock]:not(.is-arranging) .toast { bottom: 5rem; }
+
+    /* ---- the corner's buttons: back to the top, and Settings ---- */
+    .page-actions {
+        position: fixed;
+        z-index: 40;
+        right: 1rem;
+        bottom: max(1rem, env(safe-area-inset-bottom));
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .page-action {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 2.75rem;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        color: var(--ink);
+        transition: opacity var(--dur-med) ease, scale var(--dur-med) var(--ease-spring), visibility var(--dur-med);
+    }
+
+    .page-action .icon { width: 1.15rem; height: 1.15rem; }
+
+    .page-action[data-away] {
+        opacity: 0;
+        scale: 0.6;
+        visibility: hidden;
+    }
+
+    /* ---- the lens on the tile under the pointer (or the keyboard): clear, with a lit edge, and it bends only
+       round its rim, so the tile's words stay sharp ---- */
+    .tile-lens {
+        position: fixed;
+        z-index: 15;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        opacity: 0;
+        scale: 0.97;
+        box-shadow: 0 12px 26px -12px oklch(0 0 0 / 0.4), inset 0 0 0 1px oklch(1 0 0 / 0.35);
+        transition: opacity var(--dur-fast) ease, scale var(--dur-med) var(--ease-spring);
+    }
+
+    .tile-lens[data-lens="glass"] { background: transparent; }
+    .tile-lens[data-on] { opacity: 1; scale: 1; }
+    .tile-lens[data-on][data-pressed] { scale: 0.975; }
+
+    /* put away, it draws nothing (a hidden glass would still bend what's under it) */
+    .tile-lens:not([data-on]) {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    .tile-lens:not([data-on])::before { display: none; }
+    .tile-lens[data-lens="frost"] { box-shadow: 0 12px 26px -12px oklch(0 0 0 / 0.4), inset 0 0 0 1.5px oklch(1 0 0 / 0.6); }
+
+    /* under the lens, the tile doesn't lift or shade itself as well */
+    :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]):not(.is-arranging) .env-tile:is(:hover, :has(:focus-visible)) {
+        translate: none;
+        box-shadow: none;
+    }
+
     /* ---- concentric corners: a card's tiles are as round as the card, less the space between them and its edge
        (never less than the style's smallest corner) ---- */
     :root:is([data-style="aurora"], [data-style="liquid"], [data-style="neon"]) .env-tile {
@@ -138,7 +322,7 @@ cards and widgets are the content, and keep the style's frosted panels. Where th
     /* asked for less see-through glass: the style's near-solid fill over the lens */
     @media (prefers-reduced-transparency: reduce) {
         [data-lens="glass"],
-        :is(.theme-toggle, .gallery-btn, .quick-links, .toast, .tile-menu, .arrange-bar)[data-lens="glass"] { background: var(--glass-strong); }
+        :is(.theme-toggle, .gallery-btn, .quick-links, .toast, .tile-menu, .arrange-bar, .eyebrow, .group-head, .section-head h2, .pin-dock, .page-action)[data-lens="glass"] { background: var(--glass-strong); }
     }
 
     /* asked for more contrast: a solid edge round every glass control, and a firmer fill */
@@ -148,6 +332,6 @@ cards and widgets are the content, and keep the style's frosted panels. Where th
             outline-offset: -1.5px;
         }
 
-        :is(.theme-toggle, .gallery-btn, .quick-links, .toast, .tile-menu, .arrange-bar)[data-lens="glass"] { background: var(--glass-strong); }
+        :is(.theme-toggle, .gallery-btn, .quick-links, .toast, .tile-menu, .arrange-bar, .eyebrow, .group-head, .section-head h2, .pin-dock, .page-action)[data-lens="glass"] { background: var(--glass-strong); }
     }
 }

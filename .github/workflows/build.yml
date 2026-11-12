@@ -8,15 +8,16 @@
 #
 # Release versions: the first release uses the version in package.json; after that, each push
 # to main bumps the patch number (1.0.0 → 1.0.1 → …). For a bigger step, raise package.json by
-# hand (e.g. to 1.1.0) and the next release starts from there. Commits that only touch Markdown
-# or the LICENSE don't trigger a release; neither does a commit message containing [skip ci].
+# hand (e.g. to 1.1.0) and the next release starts from there. Commits that only touch Markdown,
+# the docs (and the script that takes their screenshots) or the LICENSE don't trigger a release;
+# neither does a commit message containing [skip ci].
 #
 name: Build and deploy
 
 on:
   push:
     branches: [main]
-    paths-ignore: ['**.md', 'LICENSE']
+    paths-ignore: ['**.md', 'LICENSE', 'docs/**', 'scripts/**']
   pull_request:
   workflow_dispatch:
 
