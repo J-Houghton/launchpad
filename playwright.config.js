@@ -1,6 +1,6 @@
 // playwright.config.js
-// The page tests (tests/e2e): a real browser driving the built page. Run them with `npm run test:e2e`, which
-// builds the page first.
+// The page tests (tests/e2e): a real browser driving the built page. Run them with `npm test`, which builds
+// the page first (docs/technical/testing.md).
 //
 // Liquid glass is only drawn by Chromium browsers, so the main run uses one: Edge on Windows (it's already
 // there), Playwright's own Chromium elsewhere, or whichever LAUNCHPAD_BROWSER names (msedge, chrome, chromium).

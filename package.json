@@ -10,6 +10,7 @@
     "build": "tsc && vite build",
     "test": "npm run build && playwright test",
     "test:quick": "playwright test",
+    "docs:shots": "node scripts/screenshots.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

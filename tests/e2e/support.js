@@ -1,6 +1,6 @@
 // tests/e2e/support.js
 // What the page tests share. They drive the built page (dist/index.html) the way it's really used: opened
-// straight from disk, with a launchpad.config.js beside it. `npm run test:e2e` builds it first.
+// straight from disk, with a launchpad.config.js beside it. `npm test` builds it first.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';

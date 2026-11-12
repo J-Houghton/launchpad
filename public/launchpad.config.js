@@ -5,7 +5,8 @@
 // Each card holds tiles, each with a "name", a "url" and an optional "label" (a short tag).
 // For a launch page, turn on "useColumns" and list your "columns" (e.g. DEV, TEST, PROD); each
 // tile then names its "column", and they line up from card to card. "layout" places everything
-// on a 12-column grid, and "look" sets its style, background and colours. See the README for examples.
+// on a 12-column grid, and "look" sets its style, background and colours. For examples, see
+// docs/functional/config.md in the Launchpad repository.
 //
 // This sample also turns on three of the example extensions in the extensions folder (the search box,
 // notes and a glass lens, under "widgets" → "added"). Take them out of "extensions" if you don't want them.

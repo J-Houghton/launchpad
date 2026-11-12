@@ -7,7 +7,8 @@
 // leave it (in this browser) until you put it back.
 //
 // The glass comes from Launchpad.glass(), which draws it the way the page's own panels are drawn. Chrome and
-// Edge draw the lens; other browsers show it as frosted glass. See the README.
+// Edge draw the lens; other browsers show it as frosted glass. See docs/technical/extension-api.md in the Launchpad
+// repository.
 (() => {
   if (!window.Launchpad?.glass) return; // a page from before Launchpad.glass
 

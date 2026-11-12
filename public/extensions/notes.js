@@ -4,7 +4,8 @@
 // Settings → Edit page → Page → Extensions (or to "extensions" in launchpad.config.js) and save; then add a
 // Notes widget under Widgets. Each Notes widget keeps its own text.
 //
-// Extensions are plain scripts that talk to the page through window.Launchpad — see the README.
+// Extensions are plain scripts that talk to the page through window.Launchpad: see
+// docs/technical/extension-api.md in the Launchpad repository.
 (() => {
   // a little CSS of its own, built from the page's variables so it suits every style
   const css = document.createElement('style');
